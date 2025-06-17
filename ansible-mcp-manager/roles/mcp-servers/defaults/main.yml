@@ -1,0 +1,8 @@
+---
+# Default values for mcp-servers role
+
+# Claude CLI command
+claude_cli_command: "claude"
+
+# Default MCP server command and arguments
+mcp_server_command: "npx"

@@ -1,0 +1,43 @@
+# Sensitive files
+.mcp.json
+*.env
+*.env.*
+.env.local
+.env.production
+.env.development
+
+# API Keys and tokens
+*token*
+*key*
+*secret*
+*auth*
+*pat*
+
+# Claude settings
+.claude/settings.local.json
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build outputs
+dist/
+build/
+*.tgz
+
+# Ansible
+*.retry
+.ansible/

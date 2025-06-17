@@ -1,0 +1,56 @@
+---
+- name: Check for mcp-servers.json file
+  stat:
+    path: "{{ playbook_dir }}/mcp-servers.json"
+  register: mcp_json_stat
+
+- name: Fail if no mcp-servers.json found
+  fail:
+    msg: "No mcp-servers.json file found! Create one with your MCP server definitions."
+  when: not mcp_json_stat.stat.exists
+
+- name: Read mcp-servers.json
+  slurp:
+    src: "{{ playbook_dir }}/mcp-servers.json"
+  register: mcp_json_content
+
+- name: Parse MCP servers from JSON
+  set_fact:
+    mcp_servers_raw: "{{ (mcp_json_content.content | b64decode | from_json).mcpServers }}"
+
+- name: Check for .env file for variable substitution
+  stat:
+    path: "{{ playbook_dir }}/.env"
+  register: env_file_stat
+
+- name: Load .env variables if exists
+  include_tasks: load-env.yml
+  when: env_file_stat.stat.exists
+
+- name: Transform MCP servers to playbook format
+  set_fact:
+    mcp_servers: |
+      {%- set result = {} -%}
+      {%- for name, config in mcp_servers_raw.items() -%}
+        {%- set env_processed = {} -%}
+        {%- if config.env is defined -%}
+          {%- for key, value in config.env.items() -%}
+            {%- set processed_value = value | substitute_vars(hostvars[inventory_hostname]) -%}
+            {%- set _ = env_processed.update({key: processed_value}) -%}
+          {%- endfor -%}
+        {%- endif -%}
+        {%- set server = {
+          'enabled': true,
+          'type': 'stdio',
+          'command': config.command,
+          'args': config.args | default([]),
+          'env': env_processed
+        } -%}
+        {%- set _ = result.update({name: server}) -%}
+      {%- endfor -%}
+      {{ result }}
+
+- name: Debug loaded servers
+  debug:
+    var: mcp_servers
+  when: ansible_verbosity > 0

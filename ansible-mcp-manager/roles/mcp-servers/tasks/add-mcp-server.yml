@@ -1,0 +1,73 @@
+---
+- name: Check if server requires environment variables
+  set_fact:
+    missing_env_vars: >-
+      {%- set missing = [] -%}
+      {%- if server_config.requires_env is defined -%}
+        {%- for env_var in server_config.requires_env -%}
+          {%- if server_config.env is not defined or server_config.env[env_var] is not defined or server_config.env[env_var] == '' -%}
+            {%- set _ = missing.append(env_var) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ missing | list }}
+
+- name: Display warning for missing environment variables
+  debug:
+    msg: |
+      WARNING: Server '{{ server_name }}' requires the following environment variables:
+      {% for var in missing_env_vars %}
+      - {{ var }}
+      {% endfor %}
+      
+      The server will be configured but may not function properly without these variables.
+  when: missing_env_vars | length > 0
+
+- name: Remove existing server if it exists
+  shell: echo "y" | claude mcp remove {{ server_name }}
+  when: server_name in existing_server_names
+  failed_when: false
+  changed_when: true
+
+- name: Build environment variable arguments
+  set_fact:
+    env_args: >-
+      {%- set args = [] -%}
+      {%- if server_config.env is defined -%}
+        {%- for key, value in server_config.env.items() -%}
+          {%- if value != '' -%}
+            {%- set _ = args.extend(['-e', key + '=' + value]) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ args | list }}
+
+- name: Build full command arguments
+  set_fact:
+    full_command: |
+      {% set cmd = ['claude', 'mcp', 'add'] %}
+      {% if server_scope == 'user' %}
+        {% set _ = cmd.extend(['-s', 'user']) %}
+      {% elif server_scope == 'project' %}
+        {% set _ = cmd.extend(['-s', 'project']) %}
+      {% endif %}
+      {% set _ = cmd.append(server_name) %}
+      {% set _ = cmd.append(server_config.command) %}
+      {% set _ = cmd.extend(server_config.args) %}
+      {% set _ = cmd.extend(env_args) %}
+      {{ cmd | join(' ') }}
+
+- name: Add MCP server '{{ server_name }}' to {{ server_scope }} scope
+  shell: echo "y" | {{ full_command }}
+  args:
+    chdir: "{{ mcp_project_path if server_scope == 'project' else ansible_env.HOME }}"
+  register: add_result
+  changed_when: true
+
+- name: Display server configuration result
+  debug:
+    msg: |
+      Server '{{ server_name }}' configured successfully in {{ server_scope }} scope
+      {% if missing_env_vars | length > 0 %}
+      Note: Missing environment variables may need to be configured separately
+      {% endif %}

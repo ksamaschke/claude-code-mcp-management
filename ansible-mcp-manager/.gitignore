@@ -1,0 +1,45 @@
+# Ansible
+*.retry
+*.log
+.ansible/
+
+# Configuration files with secrets
+config.yml
+secrets.yml
+*.secret
+*.key
+*.pem
+
+# Backup files
+*.backup
+*.bak
+*.ansible-backup
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Local test files
+test-*.yml
+local-*.yml
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# OS files
+Thumbs.db
+.DS_Store

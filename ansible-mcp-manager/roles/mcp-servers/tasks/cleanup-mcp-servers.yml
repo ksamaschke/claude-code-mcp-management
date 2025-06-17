@@ -1,0 +1,171 @@
+---
+- name: Read user's .claude.json file
+  slurp:
+    src: "{{ ansible_env.HOME }}/.claude.json"
+  register: user_claude_json
+  failed_when: false
+
+- name: Parse user's MCP servers
+  set_fact:
+    user_mcp_servers: "{{ (user_claude_json.content | b64decode | from_json).mcpServers | default({}) }}"
+  when: user_claude_json is not failed
+
+- name: Read project's .mcp.json file
+  slurp:
+    src: "{{ mcp_project_path }}/.mcp.json"
+  register: project_mcp_json
+  failed_when: false
+  when: mcp_scope == 'project'
+
+- name: Parse project's MCP servers
+  set_fact:
+    project_mcp_servers: "{{ (project_mcp_json.content | b64decode | from_json).mcpServers | default({}) }}"
+  when: 
+    - mcp_scope == 'project'
+    - project_mcp_json is not failed
+
+- name: Get list of all existing MCP servers from CLI
+  command: claude mcp list
+  register: all_mcp_servers
+  changed_when: false
+  failed_when: false
+
+- name: Parse all existing server names from CLI output
+  set_fact:
+    cli_server_names: >-
+      {%- set names = [] -%}
+      {%- if all_mcp_servers.rc is defined and all_mcp_servers.rc == 0 -%}
+        {%- for line in all_mcp_servers.stdout_lines | default([]) -%}
+          {%- if line and not line.startswith('Name') and not line.startswith('---') and line.strip() -%}
+            {%- set parts = line.split() -%}
+            {%- if parts|length > 0 -%}
+              {%- set _ = names.append(parts[0]) -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ names | list }}
+
+- name: Determine servers to remove (user scope)
+  set_fact:
+    servers_to_remove: >-
+      {%- set to_remove = [] -%}
+      {%- for server in user_mcp_servers.keys() | default([]) -%}
+        {%- if server not in servers_to_configure and server not in (mcp_keep_servers | default([])) -%}
+          {%- set _ = to_remove.append(server) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ to_remove | list }}
+  when: mcp_scope == 'user'
+
+- name: Determine servers to remove (project scope)
+  set_fact:
+    servers_to_remove: >-
+      {%- set to_remove = [] -%}
+      {%- for server in project_mcp_servers.keys() | default([]) -%}
+        {%- if server not in servers_to_configure and server not in (mcp_keep_servers | default([])) -%}
+          {%- set _ = to_remove.append(server) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ to_remove | list }}
+  when: mcp_scope == 'project'
+
+- name: Remove unwanted servers from CLI
+  shell: echo "y" | claude mcp remove {{ item }}
+  loop: "{{ servers_to_remove }}"
+  when: 
+    - servers_to_remove is defined
+    - servers_to_remove | length > 0
+    - item in cli_server_names
+  failed_when: false
+
+- name: Clean up user's .claude.json
+  block:
+    - name: Create cleaned mcpServers dict (user)
+      set_fact:
+        cleaned_mcp_servers: >-
+          {%- set cleaned = {} -%}
+          {%- for server, config in user_mcp_servers.items() -%}
+            {%- if server in servers_to_configure or server in (mcp_keep_servers | default([])) -%}
+              {%- set _ = cleaned.update({server: config}) -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ cleaned }}
+
+    - name: Update user's .claude.json
+      copy:
+        content: "{{ {'mcpServers': cleaned_mcp_servers} | to_nice_json }}"
+        dest: "{{ ansible_env.HOME }}/.claude.json"
+        mode: '0600'
+        backup: yes
+      when: cleaned_mcp_servers != user_mcp_servers
+  when: 
+    - mcp_scope == 'user'
+    - user_claude_json is not failed
+
+- name: Clean up project's .mcp.json
+  block:
+    - name: Create cleaned mcpServers dict (project)
+      set_fact:
+        cleaned_project_servers: >-
+          {%- set cleaned = {} -%}
+          {%- for server, config in project_mcp_servers.items() -%}
+            {%- if server in servers_to_configure or server in (mcp_keep_servers | default([])) -%}
+              {%- set _ = cleaned.update({server: config}) -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ cleaned }}
+
+    - name: Update project's .mcp.json
+      copy:
+        content: "{{ {'mcpServers': cleaned_project_servers} | to_nice_json }}"
+        dest: "{{ mcp_project_path }}/.mcp.json"
+        mode: '0644'
+        backup: yes
+      when: cleaned_project_servers != project_mcp_servers
+  when: 
+    - mcp_scope == 'project'
+    - project_mcp_json is not failed
+
+- name: Clean up disabled servers from settings
+  block:
+    - name: Remove orphaned entries from disabled servers list
+      set_fact:
+        cleaned_disabled_servers: >-
+          {%- set cleaned = [] -%}
+          {%- for server in (current_settings.disabledMcpjsonServers | default([])) -%}
+            {%- if server in servers_to_configure or server in (mcp_keep_servers | default([])) -%}
+              {%- set _ = cleaned.append(server) -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ cleaned | list }}
+
+    - name: Remove orphaned entries from enabled servers list
+      set_fact:
+        cleaned_enabled_servers: >-
+          {%- set cleaned = [] -%}
+          {%- for server in (current_settings.enabledMcpjsonServers | default([])) -%}
+            {%- if server in servers_to_configure or server in (mcp_keep_servers | default([])) -%}
+              {%- set _ = cleaned.append(server) -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{ cleaned | list }}
+
+    - name: Update settings with cleaned lists
+      set_fact:
+        current_settings: "{{ current_settings | combine({'disabledMcpjsonServers': cleaned_disabled_servers, 'enabledMcpjsonServers': cleaned_enabled_servers}) }}"
+  when: current_settings is defined
+
+- name: Display cleanup summary
+  debug:
+    msg: |
+      MCP Server Cleanup Summary ({{ mcp_scope }} scope):
+      
+      Servers removed: {{ servers_to_remove | default([]) | length }}
+      {% if servers_to_remove | default([]) | length > 0 %}
+      {% for server in servers_to_remove %}
+      - {{ server }}
+      {% endfor %}
+      {% endif %}
+      
+      Servers kept: {{ (servers_to_configure + (mcp_keep_servers | default([]))) | unique | length }}

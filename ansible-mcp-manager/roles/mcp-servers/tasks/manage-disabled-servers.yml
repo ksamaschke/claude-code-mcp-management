@@ -1,0 +1,88 @@
+---
+- name: Ensure .claude directory exists
+  file:
+    path: "{{ mcp_project_path }}/.claude"
+    state: directory
+    mode: '0755'
+  when: server_scope == 'project'
+
+- name: Ensure user .claude directory exists
+  file:
+    path: "{{ ansible_env.HOME }}/.claude"
+    state: directory
+    mode: '0755'
+  when: server_scope == 'user'
+
+- name: Set settings file path
+  set_fact:
+    settings_file: "{{ mcp_project_path }}/.claude/settings.local.json"
+  when: server_scope == 'project'
+
+- name: Set settings file path for user scope
+  set_fact:
+    settings_file: "{{ ansible_env.HOME }}/.claude/settings.local.json"
+  when: server_scope == 'user'
+
+- name: Check if settings file exists
+  stat:
+    path: "{{ settings_file }}"
+  register: settings_file_stat
+
+- name: Read existing settings
+  slurp:
+    src: "{{ settings_file }}"
+  register: existing_settings
+  when: settings_file_stat.stat.exists
+
+- name: Parse existing settings
+  set_fact:
+    current_settings: "{{ existing_settings.content | b64decode | from_json }}"
+  when: settings_file_stat.stat.exists
+
+- name: Initialize settings if file doesn't exist
+  set_fact:
+    current_settings:
+      permissions:
+        allow: []
+        deny: []
+      disabledMcpjsonServers: []
+      enabledMcpjsonServers: []
+  when: not settings_file_stat.stat.exists
+
+- name: Update disabled servers list
+  set_fact:
+    updated_settings: "{{ current_settings | combine({'disabledMcpjsonServers': mcp_disabled_servers | default([])}) }}"
+
+- name: Update enabled servers list
+  set_fact:
+    enabled_servers: >-
+      {%- set enabled = [] -%}
+      {%- for server_name, server_config in mcp_servers.items() -%}
+        {%- if server_config.enabled | default(false) and server_name not in mcp_disabled_servers -%}
+          {%- set _ = enabled.append(server_name) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ enabled }}
+
+- name: Update settings with enabled servers
+  set_fact:
+    final_settings: "{{ updated_settings | combine({'enabledMcpjsonServers': enabled_servers}) }}"
+
+- name: Write updated settings
+  copy:
+    content: "{{ final_settings | to_nice_json }}"
+    dest: "{{ settings_file }}"
+    mode: '0644'
+    backup: yes
+
+- name: Display disabled servers
+  debug:
+    msg: |
+      Disabled MCP servers in {{ server_scope }} scope:
+      {% if mcp_disabled_servers | length > 0 %}
+      {% for server in mcp_disabled_servers %}
+      - {{ server }}
+      {% endfor %}
+      {% else %}
+      No servers are disabled
+      {% endif %}
