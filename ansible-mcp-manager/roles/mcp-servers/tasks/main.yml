@@ -41,6 +41,14 @@
       {% endif %}
   when: servers_to_configure | length == 0
 
+- name: Run dry-run if requested
+  include_tasks: dry-run.yml
+  when: mcp_dry_run | default(false) | bool
+
+- name: Exit after dry-run
+  meta: end_play
+  when: mcp_dry_run | default(false) | bool
+
 - name: Clean up old MCP servers
   include_tasks: cleanup-mcp-servers.yml
   when: mcp_cleanup_orphaned | default(true)

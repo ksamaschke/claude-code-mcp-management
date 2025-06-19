@@ -1,12 +1,16 @@
 ---
+- name: Set default env file path if not provided
+  set_fact:
+    mcp_env_file: "{{ mcp_env_file | default(playbook_dir + '/.env') }}"
+
 - name: Check for .env file
   stat:
-    path: "{{ playbook_dir }}/.env"
+    path: "{{ mcp_env_file }}"
   register: env_file_stat
 
 - name: Read .env file content
   slurp:
-    src: "{{ playbook_dir }}/.env"
+    src: "{{ mcp_env_file }}"
   register: env_file_content
   when: env_file_stat.stat.exists
 

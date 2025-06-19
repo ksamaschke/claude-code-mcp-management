@@ -23,11 +23,14 @@
       The server will be configured but may not function properly without these variables.
   when: missing_env_vars | length > 0
 
-- name: Remove existing server if it exists
-  shell: echo "y" | claude mcp remove {{ server_name }}
-  when: server_name in existing_server_names
-  failed_when: false
-  changed_when: true
+- name: Check if server already exists
+  set_fact:
+    server_already_exists: "{{ server_name in existing_server_names }}"
+
+- name: Skip server if already exists
+  debug:
+    msg: "Server '{{ server_name }}' already exists in {{ server_scope }} scope - skipping"
+  when: server_already_exists
 
 - name: Build environment variable arguments
   set_fact:
@@ -41,28 +44,47 @@
         {%- endfor -%}
       {%- endif -%}
       {{ args | list }}
+  when: not server_already_exists
 
-- name: Build full command arguments
+- name: Create JSON configuration for server
   set_fact:
-    full_command: |
-      {% set cmd = ['claude', 'mcp', 'add'] %}
-      {% if server_scope == 'user' %}
-        {% set _ = cmd.extend(['-s', 'user']) %}
-      {% elif server_scope == 'project' %}
-        {% set _ = cmd.extend(['-s', 'project']) %}
-      {% endif %}
-      {% set _ = cmd.append(server_name) %}
-      {% set _ = cmd.append(server_config.command) %}
-      {% set _ = cmd.extend(server_config.args) %}
-      {% set _ = cmd.extend(env_args) %}
-      {{ cmd | join(' ') }}
+    server_json: |
+      {
+        "command": "{{ server_config.command }}",
+        "args": {{ server_config.args | to_json }},
+        {% if server_config.env is defined and server_config.env | length > 0 %}
+        "env": {{ server_config.env | to_json }}
+        {% else %}
+        "env": {}
+        {% endif %}
+      }
+  when: not server_already_exists
 
-- name: Add MCP server '{{ server_name }}' to {{ server_scope }} scope
-  shell: echo "y" | {{ full_command }}
+- name: Write server JSON to temporary file
+  copy:
+    content: "{{ server_json }}"
+    dest: "/tmp/mcp_server_{{ server_name }}.json"
+    mode: '0600'
+  when: not server_already_exists
+
+- name: Add MCP server '{{ server_name }}' to {{ server_scope }} scope using JSON
+  shell: |
+    claude mcp add-json \
+      {% if server_scope == 'user' %}-s user {% endif %}\
+      {% if server_scope == 'project' %}-s project {% endif %}\
+      "{{ server_name }}" \
+      '{{ lookup("file", "/tmp/mcp_server_" + server_name + ".json") | regex_replace("\\s+", " ") }}'
   args:
     chdir: "{{ mcp_project_path if server_scope == 'project' else ansible_env.HOME }}"
   register: add_result
   changed_when: true
+  when: not server_already_exists
+
+- name: Clean up temporary JSON file
+  file:
+    path: "/tmp/mcp_server_{{ server_name }}.json"
+    state: absent
+  when: not server_already_exists
 
 - name: Display server configuration result
   debug:
@@ -71,3 +93,4 @@
       {% if missing_env_vars | length > 0 %}
       Note: Missing environment variables may need to be configured separately
       {% endif %}
+  when: not server_already_exists

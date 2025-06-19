@@ -82,12 +82,15 @@ Options:
   -c, --check-only        Only check dependencies, don't run installation
   -v, --verbose           Run with verbose output
   --no-cleanup            Don't clean up orphaned servers
+  --config FILE           Path to mcp-servers.json file (default: script directory)
+  --env FILE              Path to .env file (default: script directory)
 
 Examples:
   $0                                    # Install all servers for user
   $0 --scope project --project .        # Install for current project
   $0 --mode individual --list github    # Install only GitHub server
   $0 --check-only                       # Only check dependencies
+  $0 --config ~/custom/mcp-servers.json # Use custom config file
 
 EOF
 }
@@ -100,6 +103,8 @@ PROJECT_PATH=""
 CHECK_ONLY=false
 VERBOSE=""
 CLEANUP=true
+CONFIG_FILE=""
+ENV_FILE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -135,6 +140,14 @@ while [[ $# -gt 0 ]]; do
             CLEANUP=false
             shift
             ;;
+        --config)
+            CONFIG_FILE="$2"
+            shift 2
+            ;;
+        --env)
+            ENV_FILE="$2"
+            shift 2
+            ;;
         *)
             print_color "$RED" "Unknown option: $1"
             show_usage
@@ -146,27 +159,36 @@ done
 # Main execution
 print_header
 
+# Set default paths if not provided
+if [ -z "$CONFIG_FILE" ]; then
+    CONFIG_FILE="$SCRIPT_DIR/mcp-servers.json"
+fi
+
+if [ -z "$ENV_FILE" ]; then
+    ENV_FILE="$SCRIPT_DIR/.env"
+fi
+
 # Check for required files
 print_color "$YELLOW" "Checking configuration files..."
 echo
 
 CONFIG_MISSING=false
 
-if [ ! -f "$SCRIPT_DIR/mcp-servers.json" ]; then
-    print_color "$RED" "✗ mcp-servers.json not found in $SCRIPT_DIR"
+if [ ! -f "$CONFIG_FILE" ]; then
+    print_color "$RED" "✗ mcp-servers.json not found at $CONFIG_FILE"
     echo "  Please create mcp-servers.json with your MCP server definitions"
     echo "  See ansible-mcp-manager/examples/mcp-servers.json for an example"
     CONFIG_MISSING=true
 else
-    print_color "$GREEN" "✓ mcp-servers.json found"
+    print_color "$GREEN" "✓ mcp-servers.json found at $CONFIG_FILE"
 fi
 
-if [ ! -f "$SCRIPT_DIR/.env" ]; then
-    print_color "$YELLOW" "⚠ .env file not found (optional)"
+if [ ! -f "$ENV_FILE" ]; then
+    print_color "$YELLOW" "⚠ .env file not found at $ENV_FILE (optional)"
     echo "  Create .env for API keys and secrets if needed"
     echo "  See ansible-mcp-manager/.env.example for an example"
 else
-    print_color "$GREEN" "✓ .env file found"
+    print_color "$GREEN" "✓ .env file found at $ENV_FILE"
 fi
 
 if [ "$CONFIG_MISSING" = true ]; then
@@ -200,7 +222,7 @@ echo
 print_color "$YELLOW" "Checking package managers used by MCP servers..."
 echo
 
-REQUIRED_COMMANDS=$(get_required_commands "$SCRIPT_DIR/mcp-servers.json")
+REQUIRED_COMMANDS=$(get_required_commands "$CONFIG_FILE")
 
 for cmd in $REQUIRED_COMMANDS; do
     case $cmd in
@@ -240,14 +262,9 @@ if [ "$CHECK_ONLY" = true ]; then
     exit 0
 fi
 
-# Copy configuration files to ansible directory
+# No need to copy files anymore, we'll pass paths to Ansible
 echo
 print_color "$YELLOW" "Preparing configuration..."
-
-cp "$SCRIPT_DIR/mcp-servers.json" "$ANSIBLE_DIR/"
-if [ -f "$SCRIPT_DIR/.env" ]; then
-    cp "$SCRIPT_DIR/.env" "$ANSIBLE_DIR/"
-fi
 
 # Build ansible-playbook command
 ANSIBLE_CMD="ansible-playbook $ANSIBLE_DIR/manage-mcp.yml"
@@ -255,6 +272,11 @@ ANSIBLE_CMD="ansible-playbook $ANSIBLE_DIR/manage-mcp.yml"
 # Add options
 ANSIBLE_CMD="$ANSIBLE_CMD -e mcp_scope=$SCOPE"
 ANSIBLE_CMD="$ANSIBLE_CMD -e mcp_mode=$MODE"
+ANSIBLE_CMD="$ANSIBLE_CMD -e mcp_config_file=$CONFIG_FILE"
+
+if [ -f "$ENV_FILE" ]; then
+    ANSIBLE_CMD="$ANSIBLE_CMD -e mcp_env_file=$ENV_FILE"
+fi
 
 if [ -n "$SERVERS" ]; then
     ANSIBLE_CMD="$ANSIBLE_CMD -e mcp_servers_list=$SERVERS"

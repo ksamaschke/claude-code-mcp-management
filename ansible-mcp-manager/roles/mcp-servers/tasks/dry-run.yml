@@ -1,0 +1,68 @@
+---
+- name: Get list of existing MCP servers for dry-run
+  command: claude mcp list
+  register: existing_servers_output
+  changed_when: false
+  failed_when: false
+
+- name: Parse existing server names for dry-run
+  set_fact:
+    existing_server_names: >-
+      {%- set names = [] -%}
+      {%- if existing_servers_output.rc is defined and existing_servers_output.rc == 0 -%}
+        {%- for line in existing_servers_output.stdout_lines | default([]) -%}
+          {%- if line and ':' in line -%}
+            {%- set server_name = line.split(':')[0].strip() -%}
+            {%- if server_name -%}
+              {%- set _ = names.append(server_name) -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ names | list }}
+
+- name: Display dry-run configuration summary
+  debug:
+    msg: |
+      ============================================
+      MCP Server Dry-Run Configuration Summary
+      ============================================
+      
+      Configuration File: {{ mcp_config_file }}
+      Environment File: {{ mcp_env_file }}
+      Scope: {{ mcp_scope }}
+      
+      Servers to be configured:
+      ------------------------
+      {% for server_name in servers_to_configure %}
+      {% set server = mcp_servers[server_name] %}
+      
+      {{ loop.index }}. {{ server_name }}:
+         Command: {{ server.command }} {{ server.args | join(' ') }}
+         {% if server.env is defined and server.env | length > 0 %}
+         Environment Variables:
+         {% for key, value in server.env.items() %}
+           - {{ key }}: {% if value and value != '' %}{{ value | regex_replace('^(.{6}).*(.{4})$', '\\1****\\2') if (key.endswith('_KEY') or key.endswith('_TOKEN') or key.endswith('_PAT')) else value }}{% else %}[NOT SET]{% endif %}
+         {% endfor %}
+         {% else %}
+         Environment Variables: None
+         {% endif %}
+         Status: {% if server_name in existing_server_names %}Already installed - will skip{% else %}Will be installed{% endif %}
+      {% endfor %}
+      
+      Environment Variable Resolution:
+      -------------------------------
+      {% set all_env_vars = {} %}
+      {% for server_name in servers_to_configure %}
+      {% set server = mcp_servers[server_name] %}
+      {% if server.env is defined %}
+      {% for key, value in server.env.items() %}
+      {% set _ = all_env_vars.update({key: value}) %}
+      {% endfor %}
+      {% endif %}
+      {% endfor %}
+      {% for key, value in all_env_vars.items() | unique %}
+      {{ key }}: {% if value and value != '' and not value.startswith('${') %}✓ Resolved{% else %}✗ NOT RESOLVED ({{ value }}){% endif %}
+      {% endfor %}
+      
+      ============================================

@@ -11,10 +11,10 @@
       {%- set names = [] -%}
       {%- if existing_user_servers.rc is defined and existing_user_servers.rc == 0 -%}
         {%- for line in existing_user_servers.stdout_lines | default([]) -%}
-          {%- if line and not line.startswith('Name') and not line.startswith('---') and line.strip() -%}
-            {%- set parts = line.split() -%}
-            {%- if parts|length > 0 -%}
-              {%- set _ = names.append(parts[0]) -%}
+          {%- if line and ':' in line -%}
+            {%- set server_name = line.split(':')[0].strip() -%}
+            {%- if server_name -%}
+              {%- set _ = names.append(server_name) -%}
             {%- endif -%}
           {%- endif -%}
         {%- endfor -%}

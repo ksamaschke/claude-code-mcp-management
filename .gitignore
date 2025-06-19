@@ -1,17 +1,14 @@
-# Sensitive files
-.mcp.json
+# Environment files (containing secrets)
+.env
+.env.*
 *.env
 *.env.*
 .env.local
 .env.production
 .env.development
 
-# API Keys and tokens
-*token*
-*key*
-*secret*
-*auth*
-*pat*
+# MCP configuration files (auto-generated)
+.mcp.json
 
 # Claude settings
 .claude/settings.local.json

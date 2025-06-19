@@ -1,26 +1,34 @@
 ---
+- name: Set default config file path if not provided
+  set_fact:
+    mcp_config_file: "{{ mcp_config_file | default(playbook_dir + '/mcp-servers.json') }}"
+
 - name: Check for mcp-servers.json file
   stat:
-    path: "{{ playbook_dir }}/mcp-servers.json"
+    path: "{{ mcp_config_file }}"
   register: mcp_json_stat
 
 - name: Fail if no mcp-servers.json found
   fail:
-    msg: "No mcp-servers.json file found! Create one with your MCP server definitions."
+    msg: "No mcp-servers.json file found at {{ mcp_config_file }}! Create one with your MCP server definitions."
   when: not mcp_json_stat.stat.exists
 
 - name: Read mcp-servers.json
   slurp:
-    src: "{{ playbook_dir }}/mcp-servers.json"
+    src: "{{ mcp_config_file }}"
   register: mcp_json_content
 
 - name: Parse MCP servers from JSON
   set_fact:
     mcp_servers_raw: "{{ (mcp_json_content.content | b64decode | from_json).mcpServers }}"
 
+- name: Set default env file path if not provided
+  set_fact:
+    mcp_env_file: "{{ mcp_env_file | default(playbook_dir + '/.env') }}"
+
 - name: Check for .env file for variable substitution
   stat:
-    path: "{{ playbook_dir }}/.env"
+    path: "{{ mcp_env_file }}"
   register: env_file_stat
 
 - name: Load .env variables if exists
