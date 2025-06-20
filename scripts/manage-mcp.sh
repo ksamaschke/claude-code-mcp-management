@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ANSIBLE_DIR="$SCRIPT_DIR/ansible-mcp-manager"
+ANSIBLE_DIR="$SCRIPT_DIR/../ansible"
 
 # Function to print colored output
 print_color() {
@@ -177,7 +177,7 @@ CONFIG_MISSING=false
 if [ ! -f "$CONFIG_FILE" ]; then
     print_color "$RED" "✗ mcp-servers.json not found at $CONFIG_FILE"
     echo "  Please create mcp-servers.json with your MCP server definitions"
-    echo "  See ansible-mcp-manager/examples/mcp-servers.json for an example"
+    echo "  See ansible/examples/mcp-servers.json for an example"
     CONFIG_MISSING=true
 else
     print_color "$GREEN" "✓ mcp-servers.json found at $CONFIG_FILE"
@@ -186,7 +186,7 @@ fi
 if [ ! -f "$ENV_FILE" ]; then
     print_color "$YELLOW" "⚠ .env file not found at $ENV_FILE (optional)"
     echo "  Create .env for API keys and secrets if needed"
-    echo "  See ansible-mcp-manager/.env.example for an example"
+    echo "  See .env.example for an example"
 else
     print_color "$GREEN" "✓ .env file found at $ENV_FILE"
 fi

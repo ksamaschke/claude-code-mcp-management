@@ -145,6 +145,20 @@ ANTHROPIC_API_KEY=your-api-key
 
 Variables are referenced in `mcp-servers.json` using `${VARIABLE_NAME}` syntax.
 
+### Using External Configuration Files
+
+If your `mcp-servers.json` and `.env` files are located outside this directory, specify their paths:
+
+```bash
+# Using custom file locations
+make sync CONFIG_FILE=/path/to/your/mcp-servers.json ENV_FILE=/path/to/your/.env
+make add-all CONFIG_FILE=~/configs/mcp-servers.json ENV_FILE=~/configs/.env
+make dry-run CONFIG_FILE=../shared/mcp-config.json
+
+# All commands support custom file paths
+make project-sync CONFIG_FILE=/external/config.json ENV_FILE=/external/.env
+```
+
 ## 🔧 Advanced Usage
 
 ### Dry-Run Mode
@@ -201,25 +215,98 @@ All Makefile targets support these variables:
 - `PROJECT` - Project path for project scope (default: `.`)
 - `SERVERS` - Comma-separated list of servers (for add/remove operations)
 
+### VM Deployment Variables
+
+For deploying to remote VMs, these additional variables are supported:
+
+- `VM` - Direct SSH format (user@hostname)
+- `HOST` - Target hostname/IP (uses SSH_USER from config)
+- `GROUP` - VM group name from Ansible inventory
+- `SSH_USER` - SSH username (overrides .env and inventory)
+- `SSH_KEY_FILE` - SSH private key path (overrides .env and inventory)
+- `SSH_PORT` - SSH port (overrides .env and inventory)
+- `DEPLOY_DIR` - Target deployment directory (default: `/opt/mcp-manager`)
+
+## 🚀 VM Deployment
+
+Deploy the MCP Manager to remote VMs with flexible SSH configuration hierarchy.
+
+### SSH Configuration Priority (Highest → Lowest)
+
+1. **Command Parameters** - Direct overrides
+2. **.env File** - Default SSH settings 
+3. **Ansible Inventory** - Per-host/group configuration
+
+### Single VM Deployment
+
+```bash
+# Direct SSH format
+make deploy-vm VM=user@server1.example.com
+
+# Use .env SSH defaults
+make deploy-vm HOST=192.168.1.100
+
+# Override SSH settings
+make deploy-vm HOST=server1 SSH_USER=admin SSH_KEY_FILE=~/.ssh/prod.pem SSH_PORT=2222
+```
+
+### Multiple VM Deployment
+
+```bash
+# Set up inventory first: ansible/inventory/hosts.yml
+make deploy-group GROUP=production
+make deploy-group GROUP=staging 
+make deploy-all  # Deploy to all VMs
+```
+
+### SSH Configuration Examples
+
+**.env file:**
+```bash
+SSH_USER=ubuntu
+SSH_KEY_FILE=~/.ssh/default-key.pem
+SSH_PORT=22
+DEPLOY_DIR=/opt/mcp-manager
+```
+
+**ansible/inventory/hosts.yml:**
+```yaml
+production:
+  vars:
+    ansible_user: prod-user
+    ansible_ssh_private_key_file: ~/.ssh/prod-key.pem
+  hosts:
+    server1:
+      ansible_host: 192.168.1.100
+```
+
 ## 📚 Documentation
 
-- [Detailed Usage Guide](USAGE.md) - Comprehensive documentation
-- [Ansible Technical Docs](ansible-mcp-manager/README.md) - For advanced users
+- [Detailed Usage Guide](docs/USAGE.md) - Comprehensive documentation
+- [Ansible Technical Docs](ansible/README.md) - For advanced users
 - [Example Configuration](mcp-servers.json.example) - Template for your configuration
 
 ## 🏗️ Architecture
 
 ```
 .
-├── Makefile                    # Easy command interface
-├── manage-mcp.sh              # Main management script
-├── mcp-add.sh                 # Add individual servers
-├── mcp-remove.sh              # Remove servers
-├── mcp-sync.sh                # Sync all servers
-├── mcp-servers.json           # Your server configuration
+├── docs/                      # Documentation
+│   ├── CLAUDE.md             # Claude Code integration guide
+│   ├── USAGE.md              # Detailed usage documentation
+│   └── CONTRIBUTING.md       # Contribution guidelines
+├── scripts/                   # Management scripts
+│   ├── manage-mcp.sh         # Main management script
+│   ├── mcp-add.sh            # Add individual servers
+│   ├── mcp-remove.sh         # Remove servers
+│   └── mcp-sync.sh           # Sync all servers
+├── ansible/                   # VM deployment automation
+│   ├── deploy.yml            # Deployment playbook
+│   ├── manage-mcp.yml        # MCP server management playbook
+│   └── inventory/            # VM inventory and SSH config
+├── Makefile                   # Easy command interface
 ├── mcp-servers.json.example   # Example configuration
-├── .env                       # Environment variables (create this)
-└── ansible-mcp-manager/       # Ansible playbook (advanced users)
+├── .env.example              # Environment variables template
+└── README.md                 # This file
 ```
 
 ### Flexible Configuration
@@ -242,11 +329,11 @@ This tool uses Claude Code's `mcp add-json` command for reliable server installa
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read the [contributing guidelines](ansible-mcp-manager/CONTRIBUTING.md) before submitting PRs.
+Contributions are welcome! Please read the [contributing guidelines](docs/CONTRIBUTING.md) before submitting PRs.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](ansible-mcp-manager/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🐛 Troubleshooting
 

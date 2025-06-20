@@ -1,0 +1,59 @@
+---
+# Example Ansible inventory with SSH configuration hierarchy
+# Copy this to hosts.yml and customize for your environment
+
+all:
+  vars:
+    # Global SSH defaults (lowest priority)
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_port: 22
+    ansible_ssh_extra_args: "-o StrictHostKeyChecking=no"
+    
+  children:
+    production:
+      vars:
+        # Production-specific SSH settings (override global)
+        ansible_user: prod-user
+        ansible_ssh_private_key_file: ~/.ssh/prod-key.pem
+      hosts:
+        prod-web1:
+          ansible_host: 192.168.1.100
+        prod-web2:
+          ansible_host: 192.168.1.101
+        prod-db1:
+          ansible_host: 192.168.1.200
+          # Host-specific override (highest priority in inventory)
+          ansible_user: postgres
+          ansible_ssh_private_key_file: ~/.ssh/db-key.pem
+          
+    staging:
+      vars:
+        ansible_user: staging
+        ansible_ssh_private_key_file: ~/.ssh/staging-key.pem
+        ansible_port: 2222
+      hosts:
+        staging-web:
+          ansible_host: 192.168.2.100
+        staging-db:
+          ansible_host: 192.168.2.200
+          
+    development:
+      vars:
+        ansible_user: dev
+      hosts:
+        dev-local:
+          ansible_host: localhost
+          ansible_connection: local
+        dev-vm1:
+          ansible_host: 192.168.3.100
+        dev-vm2:
+          ansible_host: 192.168.3.101
+          ansible_port: 2222  # Custom SSH port for this host
+
+# Priority order (highest to lowest):
+# 1. Command line parameters: make deploy-vm SSH_USER=custom SSH_KEY_FILE=~/.ssh/custom.pem
+# 2. .env file variables: SSH_USER=default SSH_KEY_FILE=~/.ssh/default.pem  
+# 3. Host-specific ansible_* variables (this file)
+# 4. Group-specific ansible_* variables (this file)
+# 5. Global ansible_* variables (this file)

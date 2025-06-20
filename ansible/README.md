@@ -161,7 +161,7 @@ ansible-playbook manage-mcp.yml -e '{"mcp_keep_servers": ["server-to-keep"]}'
 ## Directory Structure
 
 ```
-ansible-mcp-manager/
+ansible/
 ├── manage-mcp.yml          # Main playbook
 ├── mcp-servers.json        # Your MCP server definitions (create this)
 ├── .env                    # Your secrets (optional)

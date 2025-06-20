@@ -408,6 +408,23 @@ grep BRAVE_API_KEY .env
 claude mcp list
 ```
 
+#### 5. Missing Python package runner (uvx)
+
+If you get an error about `uvx` not being installed:
+
+```bash
+# On systems with externally-managed Python environments (Ubuntu 23.04+)
+# Create a virtual environment in the project directory
+python3 -m venv .venv
+source .venv/bin/activate
+pip install uv
+
+# Then retry your MCP server installation
+make add-all
+```
+
+Note: Some MCP servers require `uvx` (part of the `uv` Python package) to run Python-based servers. If you encounter this dependency issue, the virtual environment approach above should resolve it.
+
 ### Debug Mode
 
 Enable verbose output for detailed troubleshooting:

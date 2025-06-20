@@ -1,0 +1,80 @@
+---
+- name: Deploy MCP Manager to VMs
+  hosts: all
+  become: yes
+  vars:
+    # Default values (can be overridden by -e parameters from Makefile)
+    mcp_install_dir: "{{ mcp_install_dir | default('/opt/mcp-manager') }}"
+    ssh_user: "{{ ssh_user | default(ansible_user | default('ubuntu')) }}"
+    ssh_key_file: "{{ ssh_key_file | default('~/.ssh/id_rsa') }}"
+    ssh_port: "{{ ssh_port | default(ansible_port | default(22)) }}"
+  
+  tasks:
+    - name: Show deployment configuration
+      debug:
+        msg:
+          - "Deploying to: {{ inventory_hostname }}"
+          - "Install directory: {{ mcp_install_dir }}"
+          - "SSH User: {{ ssh_user }}"
+          - "SSH Key: {{ ssh_key_file }}"
+          - "SSH Port: {{ ssh_port }}"
+
+    - name: Create MCP manager directory
+      file:
+        path: "{{ mcp_install_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+
+    - name: Copy MCP manager files
+      synchronize:
+        src: ../
+        dest: "{{ mcp_install_dir }}/"
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+          - "--exclude=.env"
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+      delegate_to: localhost
+
+    - name: Make scripts executable
+      file:
+        path: "{{ mcp_install_dir }}/scripts/{{ item }}"
+        mode: '0755'
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+      loop:
+        - manage-mcp.sh
+        - mcp-add.sh
+        - mcp-remove.sh
+        - mcp-sync.sh
+
+    - name: Create .env file from template if it doesn't exist
+      template:
+        src: "{{ mcp_install_dir }}/.env.example"
+        dest: "{{ mcp_install_dir }}/.env"
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+        mode: '0600'
+        force: no
+
+    - name: Check dependencies
+      shell: cd "{{ mcp_install_dir }}" && make check
+      register: dep_check
+      ignore_errors: yes
+      become_user: "{{ ssh_user }}"
+
+    - name: Show dependency check results
+      debug:
+        var: dep_check.stdout_lines
+
+    - name: Show deployment summary
+      debug:
+        msg:
+          - "✅ MCP Manager deployed successfully to {{ inventory_hostname }}"
+          - "📁 Installation directory: {{ mcp_install_dir }}"
+          - "🔧 Run 'cd {{ mcp_install_dir }} && make help' to get started"

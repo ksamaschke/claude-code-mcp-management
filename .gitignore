@@ -10,8 +10,13 @@
 # MCP configuration files (auto-generated)
 .mcp.json
 
-# Claude settings
-.claude/settings.local.json
+# Claude settings and files
+.claude/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
 
 # Node modules
 node_modules/
