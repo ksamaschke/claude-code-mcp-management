@@ -104,7 +104,9 @@
     {%- else -%}
       {{ server_operation_results.results | default([]) }}
     {%- endif %}
-  when: mcp_operation_log_commands
+  when: 
+    - mcp_operation_log_commands
+    - (mcp_operation_parallel_enabled and parallel_wait_results is defined and parallel_wait_results.results is defined) or (not mcp_operation_parallel_enabled and server_operation_results is defined and server_operation_results.results is defined)
 
 - name: "{{ mcp_operation_execute_collect_errors_name | default('Collect operation errors') }}"
   set_fact:

@@ -16,18 +16,26 @@
         {% set _ = merged.update({'environment': mcp_parsed_env}) -%}
       {% endif -%}
       {{ merged }}
+  delegate_to: localhost
 
 - name: "{{ mcp_config_parse_transform_name | default('Transform server configurations') }}"
   set_fact:
     mcp_transformed_servers: >-
       {% set transformed = {} -%}
-      {% for server_name, server_config in (mcp_merged_config.mcpServers | default({})).items() -%}
-        {% set server_data = server_config.copy() -%}
-        {% if server_config.env is defined -%}
-          {% set env_resolved = {} -%}
-          {% for env_key, env_val in server_config.env.items() -%}
-            {% set resolved_val = env_val -%}
-            {% if mcp_parsed_env is defined and env_val.startswith('{{') and env_val.endswith('}}') -%}
+      {%- set servers_dict = {} -%}
+      {%- if mcp_merged_config.mcpServers is defined -%}
+        {%- set servers_dict = mcp_merged_config.mcpServers -%}
+      {%- else -%}
+        {%- set servers_dict = mcp_merged_config -%}
+      {%- endif -%}
+      {% for server_name, server_config in servers_dict.items() -%}
+        {% if server_name != 'environment' -%}
+          {% set server_data = server_config.copy() -%}
+          {% if server_config.env is defined -%}
+            {% set env_resolved = {} -%}
+            {% for env_key, env_val in server_config.env.items() -%}
+              {% set resolved_val = env_val -%}
+              {% if mcp_parsed_env is defined and env_val.startswith('{{') and env_val.endswith('}}') -%}
               {% set env_lookup = env_val[2:-2].strip() -%}
               {% if env_lookup in mcp_parsed_env -%}
                 {% set resolved_val = mcp_parsed_env[env_lookup] -%}
@@ -37,9 +45,11 @@
           {% endfor -%}
           {% set _ = server_data.update({'env': env_resolved}) -%}
         {% endif -%}
-        {% set _ = transformed.update({server_name: server_data}) -%}
+          {% set _ = transformed.update({server_name: server_data}) -%}
+        {% endif -%}
       {% endfor -%}
       {{ transformed }}
+  delegate_to: localhost
 
 - name: "{{ mcp_config_parse_filter_name | default('Filter enabled servers') }}"
   set_fact:
@@ -51,6 +61,7 @@
         {% endif -%}
       {% endfor -%}
       {{ enabled }}
+  delegate_to: localhost
 
 - name: "{{ mcp_config_parse_groups_name | default('Process server groups') }}"
   set_fact:

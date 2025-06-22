@@ -171,7 +171,9 @@
   # Main role execution (externalized and modular)
   roles:
     - role: "{{ mcp_config_role | default('mcp-config') }}"
-      when: mcp_execute_config_role | default(true)
+      when: 
+        - mcp_execute_config_role | default(true)
+        - mcp_operation_mode in ['sync', 'add', 'remove'] or mcp_mode in ['sync', 'add', 'remove']
       delegate_to: "{{ mcp_config_delegate | default('localhost') }}"
     - role: "{{ mcp_validation_role | default('mcp-validation') }}"
       when: mcp_execute_validation_role | default(true)

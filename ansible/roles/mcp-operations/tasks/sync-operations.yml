@@ -13,7 +13,7 @@
     msg: "Starting sync operation: synchronizing Claude CLI with configuration file"
 
 - name: "{{ mcp_operation_sync_get_current_name | default('Get current Claude CLI servers') }}"
-  command: claude mcp list
+  command: "{{ claude_cli_command }} mcp list"
   args:
     chdir: "{{ mcp_operation_context.working_dir }}"
   register: current_mcp_servers_output
@@ -44,7 +44,14 @@
         {% endif -%}
       {% endfor -%}
       {{ remove_list }}
-    servers_to_add: "{{ mcp_enabled_servers.keys() | list if mcp_enabled_servers is defined else [] }}"
+    servers_to_add: >-
+      {% set add_list = [] -%}
+      {% for server in (mcp_enabled_servers.keys() | list) -%}
+        {% if server not in current_mcp_server_names -%}
+          {% set _ = add_list.append(server) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ add_list }}
 
 - name: "{{ mcp_operation_sync_log_plan_name | default('Log sync plan') }}"
   debug:
@@ -57,7 +64,7 @@
 
 - name: "{{ mcp_operation_sync_remove_name | default('Remove servers not in config') }}"
   command: >-
-    claude mcp remove {{ item }} {{ mcp_operation_context.scope_flag }}
+    {{ claude_cli_command }} mcp remove {{ item }} {{ mcp_operation_context.scope_flag }}
   args:
     chdir: "{{ mcp_operation_context.working_dir }}"
   register: sync_remove_results
@@ -70,7 +77,7 @@
 
 - name: "{{ mcp_operation_sync_add_name | default('Add/update servers from config') }}"
   command: >-
-    claude mcp add-json {{ item }} '{{ mcp_enabled_servers[item] | to_json }}' {{ mcp_operation_context.scope_flag }}
+    {{ claude_cli_command }} mcp add-json {{ item }} '{{ mcp_enabled_servers[item] | to_json }}' {{ mcp_operation_context.scope_flag }}
   args:
     chdir: "{{ mcp_operation_context.working_dir }}"
   register: sync_add_results

@@ -16,6 +16,10 @@
     - "mcp_found_config_files is defined"
   ignore_errors: true
 
+- name: "{{ mcp_config_load_debug_files_name | default('Debug found config files') }}"
+  debug:
+    msg: "Found config files: {{ mcp_found_config_files | default([]) }}"
+
 - name: "{{ mcp_config_load_json_name | default('Load JSON configuration files') }}"
   slurp:
     src: "{{ item }}"
@@ -25,6 +29,12 @@
     - "mcp_found_config_files is defined"
     - "mcp_found_config_files | length > 0"
   ignore_errors: true
+  delegate_to: localhost
+
+- name: "{{ mcp_config_load_debug_content_name | default('Debug loaded content') }}"
+  debug:
+    msg: "Config content results: {{ config_content.results | default([]) | length }} files loaded"
+  when: config_content is defined
 
 - name: "{{ mcp_config_load_env_name | default('Load environment files') }}"
   slurp:
@@ -60,6 +70,14 @@
       {% endfor -%}
       {{ envs }}
   when: mcp_config_parser_enabled | default(true)
+  delegate_to: localhost
+
+- name: "{{ mcp_config_load_debug_parsed_name | default('Debug parsed configurations') }}"
+  debug:
+    msg: |
+      Parsed configs: {{ mcp_parsed_configs | length }} configurations
+      Parsed env vars: {{ mcp_parsed_env | length }} variables
+      Config content: {{ mcp_parsed_configs }}
 
 - name: "{{ mcp_config_load_log_name | default('Log loaded configuration summary') }}"
   debug:

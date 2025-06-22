@@ -59,6 +59,12 @@
         {%- endfor -%}
       {%- endif -%}
       {{ selected_servers | list }}
+  when: mcp_operation_mode in ['sync', 'add', 'remove']
+
+- name: "{{ mcp_operation_prepare_servers_list_name | default('Set empty server list for list operations') }}"
+  set_fact:
+    mcp_servers_to_operate: []
+  when: mcp_operation_mode == 'list'
 
 - name: "{{ mcp_operation_prepare_working_dir_name | default('Prepare working directory') }}"
   set_fact:

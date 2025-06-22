@@ -13,6 +13,11 @@
 # Claude settings and files
 .claude/
 
+# Claude configuration files (must not be committed)
+CLAUDE.md
+**/CLAUDE.md
+.claude/CLAUDE.md
+
 # Python cache files
 __pycache__/
 *.pyc
