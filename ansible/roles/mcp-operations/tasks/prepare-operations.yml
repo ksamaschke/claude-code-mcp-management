@@ -1,0 +1,117 @@
+---
+# =============================================================================
+# MCP Operations Role - Prepare Operations
+# =============================================================================
+# Prepare for operations with externalized configuration
+# =============================================================================
+
+- name: "{{ mcp_operation_prepare_vars_name | default('Prepare operation variables') }}"
+  set_fact:
+    mcp_operation_command_base: >-
+      {% if mcp_operation_mode == 'sync' -%}
+        {{ claude_cli_command }} mcp
+      {%- else -%}
+        {{ claude_cli_command }} {{ mcp_claude_commands[mcp_operation_mode] }}
+      {%- endif %}
+    mcp_operation_scope_flag: "{{ mcp_claude_command_flags['scope_' + mcp_operation_scope] }}"
+    mcp_operation_pattern: >-
+      {% if mcp_operation_mode == 'sync' -%}
+        sync
+      {%- else -%}
+        {{ mcp_claude_command_patterns[mcp_operation_mode] }}
+      {%- endif %}
+    mcp_operation_flags: >-
+      {% set flags = [] -%}
+      {% if mcp_operation_dry_run -%}
+        {% set _ = flags.append(mcp_claude_command_flags.dry_run) -%}
+      {% endif -%}
+      {% if mcp_operation_verbose | default(false) -%}
+        {% set _ = flags.append(mcp_claude_command_flags.verbose) -%}
+      {% endif -%}
+      {% if mcp_operation_force | default(false) -%}
+        {% set _ = flags.append(mcp_claude_command_flags.force) -%}
+      {% endif -%}
+      {{ flags | join(' ') }}
+
+- name: "{{ mcp_operation_prepare_servers_name | default('Prepare server list for operations') }}"
+  set_fact:
+    mcp_servers_to_operate: >-
+      {%- set selected_servers = [] -%}
+      {%- set available_servers = mcp_enabled_servers | default(mcp_servers) | default({}) -%}
+      {%- if mcp_mode == 'all' -%}
+        {%- for server_name in available_servers.keys() -%}
+          {%- if available_servers[server_name].enabled | default(true) | bool -%}
+            {%- set _ = selected_servers.append(server_name) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- elif mcp_mode == 'group' and mcp_group in mcp_processed_groups | default({}) -%}
+        {%- for server_name in mcp_processed_groups[mcp_group] -%}
+          {%- set _ = selected_servers.append(server_name) -%}
+        {%- endfor -%}
+      {%- elif mcp_mode == 'individual' and mcp_servers_list -%}
+        {%- for server_name in mcp_servers_list.split(',') -%}
+          {%- set cleaned_name = server_name.strip() -%}
+          {%- if cleaned_name in available_servers -%}
+            {%- if available_servers[cleaned_name].enabled | default(true) | bool -%}
+              {%- set _ = selected_servers.append(cleaned_name) -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ selected_servers | list }}
+
+- name: "{{ mcp_operation_prepare_working_dir_name | default('Prepare working directory') }}"
+  set_fact:
+    mcp_operation_working_dir: >-
+      {% if mcp_operation_scope == 'project' and mcp_project_path != '' -%}
+        {{ mcp_project_path }}
+      {%- else -%}
+        {{ ansible_env.HOME }}
+      {%- endif %}
+
+- name: "{{ mcp_operation_prepare_context_name | default('Prepare operation context') }}"
+  set_fact:
+    mcp_operation_context:
+      mode: "{{ mcp_operation_mode }}"
+      scope: "{{ mcp_operation_scope }}"
+      dry_run: "{{ mcp_operation_dry_run }}"
+      working_dir: "{{ mcp_operation_working_dir }}"
+      servers_count: "{{ mcp_servers_to_operate | length if mcp_servers_to_operate is defined else 0 }}"
+      command_base: "{{ mcp_operation_command_base }}"
+      scope_flag: "{{ mcp_operation_scope_flag }}"
+      flags: "{{ mcp_operation_flags }}"
+      pattern: "{{ mcp_operation_pattern }}"
+      requires_servers: "{{ mcp_operation_mode in mcp_operations_requiring_servers }}"
+
+- name: "{{ mcp_operation_prepare_log_name | default('Log operation preparation') }}"
+  debug:
+    msg: |
+      {{ mcp_operation_prepare_log_message | default('Operation preparation complete') }}:
+      {{ mcp_operation_prepare_mode_label | default('Mode') }}: {{ mcp_operation_context.mode }}
+      {{ mcp_operation_prepare_scope_label | default('Scope') }}: {{ mcp_operation_context.scope }}
+      {{ mcp_operation_prepare_servers_label | default('Servers to operate') }}: {{ mcp_servers_to_operate | length if mcp_servers_to_operate is defined else 0 }}
+      {{ mcp_operation_prepare_working_dir_label | default('Working directory') }}: {{ mcp_operation_context.working_dir }}
+      {{ mcp_operation_prepare_dry_run_label | default('Dry run') }}: {{ mcp_operation_context.dry_run }}
+  when: mcp_operation_log_commands
+
+- name: "{{ mcp_operation_prepare_validate_name | default('Validate preparation') }}"
+  assert:
+    that:
+      - >
+        (mcp_servers_to_operate | length > 0 and mcp_operation_mode in mcp_operations_requiring_servers) or
+        mcp_operation_mode in mcp_operations_no_servers_required
+      - "mcp_operation_context.command_base is defined"
+      - "mcp_operation_context.working_dir is defined"
+      - "mcp_operation_context.pattern is defined"
+    fail_msg: |
+      {{ mcp_operation_prepare_validate_fail_msg | default('Operation preparation validation failed') }}
+      
+      Debug information:
+      - Mode: {{ mcp_mode | default('undefined') }}
+      - Operation mode: {{ mcp_operation_mode | default('undefined') }}
+      - Servers list: {{ mcp_servers_list | default('undefined') }}
+      - Servers to operate: {{ mcp_servers_to_operate | length if mcp_servers_to_operate is defined else 0 }} ({{ mcp_servers_to_operate | join(', ') if mcp_servers_to_operate else 'none' }})
+      - Available servers: {{ (mcp_enabled_servers | default(mcp_servers) | default({})).keys() | list | join(', ') }}
+      - Operation requires servers: {{ mcp_operation_mode in mcp_operations_requiring_servers }}
+    success_msg: "{{ mcp_operation_prepare_validate_success_msg | default('Operation preparation validated') }}"
+  when: mcp_operation_validate_preparation | default(true)

@@ -1,0 +1,138 @@
+---
+# =============================================================================
+# MCP Operations Role - Sync Operations
+# =============================================================================
+# Synchronize Claude CLI configuration with defined configuration file:
+# 1. Get current Claude CLI servers
+# 2. Remove servers not in config file
+# 3. Add/update servers from config file
+# =============================================================================
+
+- name: "{{ mcp_operation_sync_start_name | default('Start sync operation') }}"
+  debug:
+    msg: "Starting sync operation: synchronizing Claude CLI with configuration file"
+
+- name: "{{ mcp_operation_sync_get_current_name | default('Get current Claude CLI servers') }}"
+  command: claude mcp list
+  args:
+    chdir: "{{ mcp_operation_context.working_dir }}"
+  register: current_mcp_servers_output
+  timeout: "{{ mcp_command_timeout }}"
+  retries: "{{ mcp_command_retries }}"
+  delay: "{{ mcp_command_delay }}"
+
+- name: "{{ mcp_operation_sync_parse_current_name | default('Parse current server names') }}"
+  set_fact:
+    current_mcp_server_names: >-
+      {% set servers = [] -%}
+      {% for line in current_mcp_servers_output.stdout_lines | default([]) -%}
+        {% if ':' in line -%}
+          {% set server_name = line.split(':')[0].strip() -%}
+          {% set _ = servers.append(server_name) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ servers }}
+
+- name: "{{ mcp_operation_sync_compare_name | default('Compare configurations') }}"
+  set_fact:
+    config_server_names: "{{ mcp_enabled_servers.keys() | list if mcp_enabled_servers is defined else [] }}"
+    servers_to_remove: >-
+      {% set remove_list = [] -%}
+      {% for server in current_mcp_server_names -%}
+        {% if server not in (mcp_enabled_servers.keys() | list) -%}
+          {% set _ = remove_list.append(server) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ remove_list }}
+    servers_to_add: "{{ mcp_enabled_servers.keys() | list if mcp_enabled_servers is defined else [] }}"
+
+- name: "{{ mcp_operation_sync_log_plan_name | default('Log sync plan') }}"
+  debug:
+    msg: |
+      Sync operation plan:
+      - Current servers in Claude CLI: {{ current_mcp_server_names | length }} ({{ current_mcp_server_names | join(', ') if current_mcp_server_names | length > 0 else 'none' }})
+      - Servers in config file: {{ config_server_names | length }} ({{ config_server_names | join(', ') if config_server_names | length > 0 else 'none' }})
+      - Servers to remove: {{ servers_to_remove | length }} ({{ servers_to_remove | join(', ') if servers_to_remove | length > 0 else 'none' }})
+      - Servers to add/update: {{ servers_to_add | length }} ({{ servers_to_add | join(', ') if servers_to_add | length > 0 else 'none' }})
+
+- name: "{{ mcp_operation_sync_remove_name | default('Remove servers not in config') }}"
+  command: >-
+    claude mcp remove {{ item }} {{ mcp_operation_context.scope_flag }}
+  args:
+    chdir: "{{ mcp_operation_context.working_dir }}"
+  register: sync_remove_results
+  loop: "{{ servers_to_remove }}"
+  timeout: "{{ mcp_command_timeout }}"
+  retries: "{{ mcp_command_retries }}"
+  delay: "{{ mcp_command_delay }}"
+  ignore_errors: "{{ mcp_operation_continue_on_error }}"
+  when: servers_to_remove is defined and servers_to_remove | length > 0
+
+- name: "{{ mcp_operation_sync_add_name | default('Add/update servers from config') }}"
+  command: >-
+    claude mcp add-json {{ item }} '{{ mcp_enabled_servers[item] | to_json }}' {{ mcp_operation_context.scope_flag }}
+  args:
+    chdir: "{{ mcp_operation_context.working_dir }}"
+  register: sync_add_results
+  loop: "{{ servers_to_add }}"
+  timeout: "{{ mcp_command_timeout }}"
+  retries: "{{ mcp_command_retries }}"
+  delay: "{{ mcp_command_delay }}"
+  ignore_errors: "{{ mcp_operation_continue_on_error }}"
+  when: servers_to_add is defined and servers_to_add | length > 0
+
+- name: "{{ mcp_operation_sync_log_remove_name | default('Log remove operation results') }}"
+  debug:
+    msg: |
+      Remove operation {{ item.item }}: 
+      {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}
+      {% if item.stdout is defined and item.stdout != '' %}
+      Output: {{ item.stdout }}
+      {% endif %}
+      {% if item.stderr is defined and item.stderr != '' %}
+      Error: {{ item.stderr }}
+      {% endif %}
+  loop: "{{ sync_remove_results.results | default([]) }}"
+  when: mcp_operation_log_commands
+
+- name: "{{ mcp_operation_sync_log_add_name | default('Log add operation results') }}"
+  debug:
+    msg: |
+      Add operation {{ item.item }}: 
+      {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}
+      {% if item.stdout is defined and item.stdout != '' %}
+      Output: {{ item.stdout }}
+      {% endif %}
+      {% if item.stderr is defined and item.stderr != '' %}
+      Error: {{ item.stderr }}
+      {% endif %}
+  loop: "{{ sync_add_results.results | default([]) }}"
+  when: mcp_operation_log_commands
+
+- name: "{{ mcp_operation_sync_collect_errors_name | default('Collect sync operation errors') }}"
+  set_fact:
+    mcp_sync_operation_errors: >-
+      {% set errors = [] -%}
+      {% for result in sync_remove_results.results | default([]) -%}
+        {% if result.rc != 0 -%}
+          {% set _ = errors.append({'operation': 'remove', 'server': result.item, 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
+        {% endif -%}
+      {% endfor -%}
+      {% for result in sync_add_results.results | default([]) -%}
+        {% if result.rc != 0 and 'already exists' not in result.stderr -%}
+          {% set _ = errors.append({'operation': 'add', 'server': result.item, 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ errors }}
+  when: mcp_operation_collect_errors
+
+- name: "{{ mcp_operation_sync_summary_name | default('Display sync operation summary') }}"
+  debug:
+    msg: |
+      Sync operation complete:
+      - Servers removed: {{ sync_remove_results.results | default([]) | selectattr('rc', 'equalto', 0) | list | length }}
+      - Servers added/updated: {{ sync_add_results.results | default([]) | selectattr('rc', 'equalto', 0) | list | length }}
+      - Total errors: {{ mcp_sync_operation_errors | length if mcp_sync_operation_errors is defined else 0 }}
+      {% if mcp_sync_operation_errors is defined and mcp_sync_operation_errors | length > 0 %}
+      - Failed operations: {{ mcp_sync_operation_errors | map(attribute='server') | list | join(', ') }}
+      {% endif %}

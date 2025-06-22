@@ -1,0 +1,67 @@
+---
+# =============================================================================
+# MCP Operations Role - Post-Validate Operations
+# =============================================================================
+# Post-operation validation with externalized configuration
+# =============================================================================
+
+- name: "{{ mcp_post_validate_current_config_name | default('Get current MCP configuration') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.list }}"
+  register: mcp_post_config_check
+  failed_when: false
+  changed_when: false
+  when: mcp_post_validate_config_check | default(true)
+
+- name: "{{ mcp_post_validate_servers_name | default('Validate operated servers') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.status }} {{ item }}"
+  register: mcp_post_server_checks
+  failed_when: false
+  changed_when: false
+  loop: "{{ mcp_servers_to_operate }}"
+  when: 
+    - mcp_post_validate_individual_servers | default(true)
+    - mcp_servers_to_operate | length > 0
+
+- name: "{{ mcp_post_validate_connectivity_name | default('Validate MCP connectivity') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.status }}"
+  register: mcp_post_connectivity_check
+  failed_when: false
+  changed_when: false
+  when: mcp_post_validate_connectivity | default(true)
+
+- name: "{{ mcp_post_validate_scope_config_name | default('Validate scope configuration') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.list }} {{ mcp_operation_scope_flag }}"
+  register: mcp_post_scope_check
+  failed_when: false
+  changed_when: false
+  when: mcp_post_validate_scope_config | default(true)
+
+- name: "{{ mcp_post_validate_collect_results_name | default('Collect validation results') }}"
+  set_fact:
+    mcp_post_validation_results:
+      config_check: "{{ mcp_post_config_check.rc == 0 if mcp_post_config_check is defined else 'SKIPPED' }}"
+      connectivity_check: "{{ mcp_post_connectivity_check.rc == 0 if mcp_post_connectivity_check is defined else 'SKIPPED' }}"
+      scope_check: "{{ mcp_post_scope_check.rc == 0 if mcp_post_scope_check is defined else 'SKIPPED' }}"
+      servers_validated: "{{ mcp_post_server_checks.results | selectattr('rc', 'equalto', 0) | list | length if mcp_post_server_checks is defined else 0 }}"
+      servers_failed: "{{ mcp_post_server_checks.results | rejectattr('rc', 'equalto', 0) | list | length if mcp_post_server_checks is defined else 0 }}"
+
+- name: "{{ mcp_post_validate_assert_success_name | default('Assert post-operation success') }}"
+  assert:
+    that:
+      - mcp_post_validation_results.config_check == true or mcp_post_validation_results.config_check == 'SKIPPED'
+      - mcp_post_validation_results.connectivity_check == true or mcp_post_validation_results.connectivity_check == 'SKIPPED' or mcp_operation_mode in ['list', 'status']
+      - mcp_post_validation_results.servers_failed | int == 0 or not mcp_post_validate_strict | default(false)
+    fail_msg: "{{ mcp_post_validate_fail_msg | default('Post-operation validation failed') }}"
+    success_msg: "{{ mcp_post_validate_success_msg | default('Post-operation validation passed') }}"
+  when: mcp_post_validate_assert | default(false)
+
+- name: "{{ mcp_post_validate_log_name | default('Log post-validation results') }}"
+  debug:
+    msg: |
+      {{ mcp_post_validate_log_message | default('Post-operation validation complete') }}:
+      - {{ mcp_post_validate_config_label | default('Config Check') }}: {{ mcp_post_validation_results.config_check }}
+      - {{ mcp_post_validate_connectivity_label | default('Connectivity') }}: {{ mcp_post_validation_results.connectivity_check }}
+      - {{ mcp_post_validate_scope_label | default('Scope Check') }}: {{ mcp_post_validation_results.scope_check }}
+      - {{ mcp_post_validate_servers_ok_label | default('Servers OK') }}: {{ mcp_post_validation_results.servers_validated }}
+      - {{ mcp_post_validate_servers_failed_label | default('Servers Failed') }}: {{ mcp_post_validation_results.servers_failed }}
+  when: mcp_post_validate_log_results | default(true)

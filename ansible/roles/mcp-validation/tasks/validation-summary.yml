@@ -1,0 +1,59 @@
+---
+# =============================================================================
+# MCP Validation Role - Validation Summary
+# =============================================================================
+# Display validation results with externalized messages
+# =============================================================================
+
+- name: "{{ mcp_validation_summary_collect_name | default('Collect validation results') }}"
+  set_fact:
+    mcp_validation_results:
+      claude_cli: "{{ claude_cli_check.rc == 0 if (claude_cli_check is defined and claude_cli_check.rc is defined) else 'SKIPPED' }}"
+      nodejs: "{{ nodejs_check.rc == 0 if (nodejs_check is defined and nodejs_check.rc is defined) else 'SKIPPED' }}"
+      npm: "{{ npm_check.rc == 0 if (npm_check is defined and npm_check.rc is defined) else 'SKIPPED' }}"
+      npx: "{{ npx_check.rc == 0 if (npx_check is defined and npx_check.rc is defined) else 'SKIPPED' }}"
+      uv: "{{ uv_check.rc == 0 if (uv_check is defined and uv_check.rc is defined) else 'SKIPPED' }}"
+      docker: "{{ docker_check.rc == 0 if (docker_check is defined and docker_check.rc is defined) else 'SKIPPED' }}"
+      python: "{{ python_check.rc == 0 if (python_check is defined and python_check.rc is defined) else 'SKIPPED' }}"
+      environment: "{{ 'PASSED' if mcp_validate_environment_enabled else 'SKIPPED' }}"
+      permissions: "{{ 'PASSED' if mcp_validate_permissions_enabled else 'SKIPPED' }}"
+      paths: "{{ 'PASSED' if mcp_validate_paths_enabled else 'SKIPPED' }}"
+      network: "{{ 'PASSED' if mcp_validate_network_enabled else 'SKIPPED' }}"
+      resources: "{{ 'PASSED' if mcp_validate_resources_enabled else 'SKIPPED' }}"
+
+- name: "{{ mcp_validation_summary_count_name | default('Count validation results') }}"
+  set_fact:
+    mcp_validation_passed: >-
+      {{ mcp_validation_results.values() | select('==', true) | list | length }}
+    mcp_validation_failed: >-
+      {{ mcp_validation_results.values() | select('==', false) | list | length }}
+    mcp_validation_skipped: >-
+      {{ mcp_validation_results.values() | select('==', 'SKIPPED') | list | length }}
+
+- name: "{{ mcp_validation_summary_display_name | default('Display validation summary') }}"
+  debug:
+    msg: |
+      {{ mcp_validation_summary_header | default('=== MCP VALIDATION SUMMARY ===') }}
+      
+      {{ mcp_validation_summary_status_label | default('Overall Status') }}: {{ 'PASSED' if mcp_validation_failed | int == 0 else 'FAILED' }}
+      
+      {{ mcp_validation_summary_details_label | default('Validation Details') }}:
+      {% for check, result in mcp_validation_results.items() %}
+      - {{ check | title }}: {{ result if result is boolean else result }}
+      {% endfor %}
+      
+      {{ mcp_validation_summary_counts_label | default('Summary Counts') }}:
+      - {{ mcp_validation_summary_passed_label | default('Passed') }}: {{ mcp_validation_passed }}
+      - {{ mcp_validation_summary_failed_label | default('Failed') }}: {{ mcp_validation_failed }}
+      - {{ mcp_validation_summary_skipped_label | default('Skipped') }}: {{ mcp_validation_skipped }}
+      
+      {% if mcp_validation_failed | int > 0 %}
+      {{ mcp_validation_summary_action_label | default('Recommended Action') }}: {{ mcp_validation_summary_action_message | default('Review and fix failed validations before proceeding') }}
+      {% endif %}
+
+- name: "{{ mcp_validation_summary_fail_name | default('Fail on validation errors') }}"
+  fail:
+    msg: "{{ mcp_validation_summary_fail_message | default('Validation failed. Cannot proceed with MCP server management.') }}"
+  when:
+    - mcp_validation_fail_fast
+    - "mcp_validation_failed | int > 0"

@@ -1,0 +1,84 @@
+---
+# =============================================================================
+# MCP Operations Role - Operations Summary
+# =============================================================================
+# Display comprehensive operations summary with externalized messages
+# =============================================================================
+
+- name: "{{ mcp_summary_collect_stats_name | default('Collect operation statistics') }}"
+  set_fact:
+    mcp_operation_summary:
+      mode: "{{ mcp_operation_mode }}"
+      scope: "{{ mcp_operation_scope }}"
+      working_dir: "{{ mcp_operation_working_dir }}"
+      servers_operated: "{{ mcp_servers_to_operate | length }}"
+      dry_run: "{{ mcp_operation_dry_run }}"
+      backup_created: "{{ mcp_backup_filename is defined }}"
+      validation_passed: "{{ mcp_post_validation_results.config_check if mcp_post_validation_results is defined else 'UNKNOWN' }}"
+      cleanup_performed: "{{ (mcp_cleanup_results.temp_files_removed | default(0) | int) > 0 if mcp_cleanup_results is defined else false }}"
+
+- name: "{{ mcp_summary_get_final_config_name | default('Get final MCP configuration') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.list }} {{ mcp_operation_scope_flag }}"
+  register: mcp_final_config
+  failed_when: false
+  changed_when: false
+  when: mcp_summary_show_final_config | default(true)
+
+- name: "{{ mcp_summary_calculate_duration_name | default('Calculate operation duration') }}"
+  set_fact:
+    mcp_operation_end_time: "{{ ansible_date_time.epoch }}"
+    mcp_operation_duration: "{{ (ansible_date_time.epoch | int) - (mcp_operation_start_time | default(ansible_date_time.epoch) | int) }}"
+  when: mcp_summary_calculate_duration | default(true)
+
+- name: "{{ mcp_summary_display_name | default('Display operations summary') }}"
+  debug:
+    msg: |
+      {{ mcp_summary_header | default('=== MCP OPERATIONS SUMMARY ===') }}
+      
+      {{ mcp_summary_operation_label | default('Operation Details') }}:
+      - {{ mcp_summary_mode_label | default('Mode') }}: {{ mcp_operation_summary.mode }}
+      - {{ mcp_summary_scope_label | default('Scope') }}: {{ mcp_operation_summary.scope }}
+      - {{ mcp_summary_working_dir_label | default('Working Directory') }}: {{ mcp_operation_summary.working_dir }}
+      - {{ mcp_summary_servers_label | default('Servers Operated') }}: {{ mcp_operation_summary.servers_operated }}
+      - {{ mcp_summary_dry_run_label | default('Dry Run') }}: {{ mcp_operation_summary.dry_run }}
+      
+      {{ mcp_summary_results_label | default('Operation Results') }}:
+      - {{ mcp_summary_backup_label | default('Backup Created') }}: {{ mcp_operation_summary.backup_created }}
+      - {{ mcp_summary_validation_label | default('Validation Passed') }}: {{ mcp_operation_summary.validation_passed }}
+      - {{ mcp_summary_cleanup_label | default('Cleanup Performed') }}: {{ mcp_operation_summary.cleanup_performed }}
+      {% if mcp_operation_duration is defined %}
+      - {{ mcp_summary_duration_label | default('Duration') }}: {{ mcp_operation_duration }} {{ mcp_summary_duration_unit | default('seconds') }}
+      {% endif %}
+      
+      {% if mcp_servers_to_operate | length > 0 %}
+      {{ mcp_summary_servers_operated_label | default('Servers Operated') }}:
+      {% for server in mcp_servers_to_operate %}
+      - {{ server }}
+      {% endfor %}
+      {% endif %}
+      
+      {% if mcp_final_config is defined and mcp_final_config.rc == 0 %}
+      {{ mcp_summary_final_config_label | default('Final Configuration') }}:
+      {{ mcp_final_config.stdout | default('No output available') }}
+      {% endif %}
+      
+      {{ mcp_summary_footer | default('=== OPERATIONS COMPLETE ===') }}
+
+- name: "{{ mcp_summary_save_report_name | default('Save operation report') }}"
+  copy:
+    content: |
+      {
+        "operation_summary": {{ mcp_operation_summary | to_json }},
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "final_config": {{ mcp_final_config.stdout | default('{}') }},
+        "servers_operated": {{ mcp_servers_to_operate | to_json }}
+      }
+    dest: "{{ mcp_summary_report_dir | default(ansible_env.HOME + '/.claude/reports') }}/mcp-operation-{{ ansible_date_time.epoch }}.json"
+    mode: '0644'
+  when: mcp_summary_save_report | default(false)
+
+- name: "{{ mcp_summary_cleanup_vars_name | default('Clean up operation variables') }}"
+  set_fact:
+    mcp_operation_start_time: null
+    mcp_operation_end_time: null
+  when: mcp_summary_cleanup_vars | default(true)

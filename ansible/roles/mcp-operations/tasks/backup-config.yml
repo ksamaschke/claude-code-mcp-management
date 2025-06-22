@@ -1,0 +1,51 @@
+---
+# =============================================================================
+# MCP Operations Role - Backup Config
+# =============================================================================
+# Backup current MCP configuration before changes
+# =============================================================================
+
+- name: "{{ mcp_backup_create_dir_name | default('Create backup directory') }}"
+  file:
+    path: "{{ mcp_backup_directory | default(ansible_env.HOME + '/.claude/backups') }}"
+    state: directory
+    mode: '0755'
+  when: mcp_backup_create_directory | default(true)
+
+- name: "{{ mcp_backup_timestamp_name | default('Generate backup timestamp') }}"
+  set_fact:
+    mcp_backup_timestamp: "{{ ansible_date_time.epoch }}"
+    mcp_backup_filename: "mcp-config-backup-{{ ansible_date_time.epoch }}.json"
+
+- name: "{{ mcp_backup_current_config_name | default('Backup current MCP configuration') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.list }} --format json"
+  register: mcp_current_config
+  failed_when: false
+  changed_when: false
+  when: mcp_backup_capture_current | default(true)
+
+- name: "{{ mcp_backup_save_config_name | default('Save backup to file') }}"
+  copy:
+    content: |
+      {
+        "timestamp": "{{ ansible_date_time.iso8601 }}",
+        "operation_mode": "{{ mcp_operation_mode }}",
+        "operation_scope": "{{ mcp_operation_scope }}",
+        "working_directory": "{{ mcp_operation_working_dir }}",
+        "current_config": {{ mcp_current_config.stdout | default('{}') }},
+        "servers_to_operate": {{ mcp_servers_to_operate | to_json }}
+      }
+    dest: "{{ mcp_backup_directory | default(ansible_env.HOME + '/.claude/backups') }}/{{ mcp_backup_filename }}"
+    mode: '0644'
+  when: 
+    - mcp_backup_save_to_file | default(true)
+    - mcp_current_config is defined
+
+- name: "{{ mcp_backup_log_name | default('Log backup creation') }}"
+  debug:
+    msg: |
+      {{ mcp_backup_log_message | default('Configuration backup created') }}:
+      - {{ mcp_backup_file_label | default('Backup file') }}: {{ mcp_backup_directory | default(ansible_env.HOME + '/.claude/backups') }}/{{ mcp_backup_filename }}
+      - {{ mcp_backup_timestamp_label | default('Timestamp') }}: {{ ansible_date_time.iso8601 }}
+      - {{ mcp_backup_servers_label | default('Servers backed up') }}: {{ mcp_servers_to_operate | length }}
+  when: mcp_backup_log_creation | default(true)

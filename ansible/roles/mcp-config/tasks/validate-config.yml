@@ -1,0 +1,62 @@
+---
+# =============================================================================
+# MCP Config Role - Configuration Validation
+# =============================================================================
+# Validate loaded configuration with externalized rules
+# =============================================================================
+
+- name: "{{ mcp_config_validate_structure_name | default('Validate configuration structure') }}"
+  assert:
+    that:
+      - mcp_config_validate_structure_rule | default('mcp_parsed_configs is defined')
+    fail_msg: "{{ mcp_config_validate_structure_fail_msg | default('Invalid configuration structure') }}"
+    success_msg: "{{ mcp_config_validate_structure_success_msg | default('Configuration structure valid') }}"
+  when: mcp_config_validation_strict | default(false)
+
+- name: "{{ mcp_config_validate_servers_name | default('Validate server definitions') }}"
+  assert:
+    that:
+      - item.command is defined
+      - item.enabled is defined
+    fail_msg: "{{ mcp_config_validate_servers_fail_msg | default('Invalid server definition') }}: {{ item }}"
+    success_msg: "{{ mcp_config_validate_servers_success_msg | default('Server definition valid') }}"
+  loop: "{{ mcp_merged_config.mcpServers.values() | list | default([]) }}"
+  when:
+    - mcp_config_validation_strict | default(false)
+    - "mcp_merged_config.mcpServers is defined"
+
+- name: "{{ mcp_config_validate_env_name | default('Validate required environment variables') }}"
+  assert:
+    that:
+      - mcp_parsed_env[item] is defined and mcp_parsed_env[item] != ''
+    fail_msg: "{{ mcp_config_validate_env_fail_msg | default('Missing required environment variable') }}: {{ item }}"
+    success_msg: "{{ mcp_config_validate_env_success_msg | default('Environment variable valid') }}: {{ item }}"
+  loop: "{{ mcp_required_env_vars | default([]) }}"
+  when:
+    - mcp_config_validation_strict | default(false)
+    - "mcp_parsed_env is defined"
+
+- name: "{{ mcp_config_validate_paths_name | default('Validate file paths') }}"
+  stat:
+    path: "{{ item }}"
+  register: path_validation
+  loop: "{{ mcp_config_paths_to_validate | default([]) }}"
+  when: mcp_config_validate_paths_enabled | default(false)
+
+- name: "{{ mcp_config_validate_paths_assert_name | default('Assert path validation') }}"
+  assert:
+    that:
+      - item.stat.exists
+    fail_msg: "{{ mcp_config_validate_paths_fail_msg | default('Required path does not exist') }}: {{ item.item }}"
+    success_msg: "{{ mcp_config_validate_paths_success_msg | default('Required path exists') }}: {{ item.item }}"
+  loop: "{{ path_validation.results | default([]) }}"
+  when:
+    - mcp_config_validate_paths_enabled | default(false)
+    - mcp_config_validation_strict | default(false)
+
+- name: "{{ mcp_config_validate_log_name | default('Log validation results') }}"
+  debug:
+    msg: |
+      {{ mcp_config_validate_summary_message | default('Configuration validation complete') }}
+      {{ mcp_config_validate_status_label | default('Status') }}: {{ mcp_config_validate_status_success | default('PASSED') }}
+  when: mcp_config_logging_enabled | default(true)

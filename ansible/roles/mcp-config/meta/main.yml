@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: mcp-config
+  namespace: mcp
+  author: MCP Management System
+  description: Configuration loading and parsing for MCP servers with fully externalized variables
+  company: ""
+  license: MIT
+  min_ansible_version: "2.9"
+  
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+  
+  galaxy_tags:
+    - mcp
+    - configuration
+    - claude
+    - management
+
+dependencies: []

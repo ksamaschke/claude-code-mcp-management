@@ -1,0 +1,208 @@
+---
+# =============================================================================
+# MCP Server Management - Clean Minimal Playbook
+# =============================================================================
+# Fully externalized variables - NO hardcoding
+# All configuration comes from group_vars/, host_vars/, or -e parameters
+# =============================================================================
+
+# Dynamic inventory management - Add remote host if not localhost
+- name: "{{ mcp_inventory_setup_name | default('Setup Dynamic Inventory') }}"
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: "{{ mcp_add_remote_host_name | default('Add remote host to inventory') }}"
+      add_host:
+        name: "{{ mcp_target_host }}"
+        ansible_host: "{{ mcp_target_host }}"
+        ansible_user: "{{ ansible_user | default(mcp_default_remote_user | default('ubuntu')) }}"
+        ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file | default(mcp_default_ssh_key | default('~/.ssh/id_rsa')) }}"
+        ansible_ssh_extra_args: "{{ ansible_ssh_extra_args | default('-o StrictHostKeyChecking=no') }}"
+        groups: 
+          - mcp_targets
+      when: 
+        - mcp_target_host is defined
+        - mcp_target_host != 'localhost'
+        - mcp_target_host != '127.0.0.1'
+      delegate_to: localhost
+
+- name: "{{ mcp_playbook_name | default('MCP Server Management') }}"
+  hosts: "{{ mcp_target_host | default('localhost') }}"
+  connection: "{{ 'local' if (mcp_target_host | default('localhost')) in ['localhost', '127.0.0.1'] else 'ssh' }}"
+  gather_facts: "{{ mcp_gather_facts | default(true) }}"
+  
+  # All variables externalized - no hardcoded values
+  vars:
+    # Operation scope and mode
+    mcp_scope: "{{ scope | default(mcp_default_scope) }}"
+    mcp_project_path: "{{ project_path | default(mcp_default_project_path) }}"
+    mcp_mode: "{{ mode | default(mcp_default_mode) }}"
+    mcp_servers_list: "{{ servers | default(mcp_default_servers_list) }}"
+    mcp_group: "{{ group | default(mcp_default_group) }}"
+    
+    # Operational flags
+    mcp_dry_run: "{{ dry_run | default(mcp_dry_run_default) }}"
+    mcp_cleanup_orphaned: "{{ cleanup_orphaned | default(mcp_cleanup_orphaned_default) }}"
+    
+    # Configuration files - FIXED: Use direct parameter from Makefile
+    mcp_config_file: "{{ config_file | default('mcp-servers.json') }}"
+    mcp_env_file: "{{ env_file | default('.env') }}"
+
+  # Pre-flight validation (externalized)
+  pre_tasks:
+    - name: "{{ mcp_pre_task_load_env_name | default('Load environment and configuration') }}"
+      include_role:
+        name: "{{ mcp_role_name | default('mcp-servers') }}"
+        tasks_from: "{{ mcp_load_env_task | default('load-env') }}"
+      when: mcp_load_env_enabled | default(true)
+        
+    - name: "{{ mcp_pre_task_validate_scope_name | default('Validate operation scope') }}"
+      fail:
+        msg: "{{ mcp_invalid_scope_message | default('Invalid scope') }} '{{ mcp_scope }}'. {{ mcp_valid_scopes_message | default('Must be user or project') }}"
+      when: 
+        - mcp_validate_scope | default(true)
+        - mcp_scope not in mcp_valid_scopes | default(['user', 'project'])
+      
+    - name: "{{ mcp_pre_task_validate_project_name | default('Validate project path requirement') }}"
+      fail:
+        msg: "{{ mcp_project_path_required_message | default('project_path is required when scope is project') }}"
+      when: 
+        - mcp_validate_project_path | default(true)
+        - "mcp_scope == 'project'"
+        - "mcp_project_path == ''"
+      
+    - name: "{{ mcp_pre_task_discover_claude_name | default('Discover and validate Claude CLI') }}"
+      block:
+        # Try ALL methods unconditionally to find the best working option
+        - name: "{{ mcp_discover_claude_cli_which_name | default('Try which claude') }}"
+          command: "which claude"
+          register: claude_cli_which_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_npx_name | default('Try npx @anthropic-ai/claude-code') }}"
+          command: "npx @anthropic-ai/claude-code --version"
+          register: claude_cli_npx_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_npm_global_name | default('Try ~/.npm-global/bin/claude') }}"
+          command: "{{ ansible_env.HOME }}/.npm-global/bin/claude --version"
+          register: claude_cli_npm_global_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_local_bin_name | default('Try ~/.local/bin/claude') }}"
+          command: "{{ ansible_env.HOME }}/.local/bin/claude --version"
+          register: claude_cli_local_bin_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_usr_local_name | default('Try /usr/local/bin/claude') }}"
+          command: "/usr/local/bin/claude --version"
+          register: claude_cli_usr_local_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_opt_name | default('Try /opt/claude/bin/claude') }}"
+          command: "/opt/claude/bin/claude --version"
+          register: claude_cli_opt_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_node_modules_name | default('Try ./node_modules/.bin/claude') }}"
+          command: "./node_modules/.bin/claude --version"
+          register: claude_cli_node_modules_check
+          failed_when: false
+          changed_when: false
+
+        - name: "{{ mcp_discover_claude_cli_set_command_name | default('Set discovered Claude CLI command') }}"
+          set_fact:
+            claude_cli_command: >-
+              {% if claude_cli_which_check.rc == 0 -%}
+                claude
+              {%- elif claude_cli_npx_check.rc == 0 -%}
+                npx @anthropic-ai/claude-code
+              {%- elif claude_cli_npm_global_check.rc == 0 -%}
+                {{ ansible_env.HOME }}/.npm-global/bin/claude
+              {%- elif claude_cli_local_bin_check.rc == 0 -%}
+                {{ ansible_env.HOME }}/.local/bin/claude
+              {%- elif claude_cli_usr_local_check.rc == 0 -%}
+                /usr/local/bin/claude
+              {%- elif claude_cli_opt_check.rc == 0 -%}
+                /opt/claude/bin/claude
+              {%- elif claude_cli_node_modules_check.rc == 0 -%}
+                ./node_modules/.bin/claude
+              {%- else -%}
+                claude
+              {%- endif %}
+
+        - name: "{{ mcp_validate_claude_cli_final_name | default('Validate discovered Claude CLI') }}"
+          command: "{{ claude_cli_command }} --version"
+          register: claude_cli_final_check
+          failed_when: claude_cli_final_check.rc != 0
+          changed_when: false
+
+        - name: "{{ mcp_log_claude_cli_discovery_name | default('Log Claude CLI discovery result') }}"
+          debug:
+            msg: |
+              Claude CLI Discovery Results:
+              - which claude: {{ 'SUCCESS' if claude_cli_which_check.rc == 0 else 'FAILED' }}
+              - npx @anthropic-ai/claude-code: {{ 'SUCCESS' if claude_cli_npx_check.rc == 0 else 'FAILED' }}
+              - ~/.npm-global/bin/claude: {{ 'SUCCESS' if claude_cli_npm_global_check.rc == 0 else 'FAILED' }}
+              - ~/.local/bin/claude: {{ 'SUCCESS' if claude_cli_local_bin_check.rc == 0 else 'FAILED' }}
+              - /usr/local/bin/claude: {{ 'SUCCESS' if claude_cli_usr_local_check.rc == 0 else 'FAILED' }}
+              - /opt/claude/bin/claude: {{ 'SUCCESS' if claude_cli_opt_check.rc == 0 else 'FAILED' }}
+              - ./node_modules/.bin/claude: {{ 'SUCCESS' if claude_cli_node_modules_check.rc == 0 else 'FAILED' }}
+              
+              SELECTED COMMAND: {{ claude_cli_command }}
+              VALIDATION: {{ 'SUCCESS' if claude_cli_final_check.rc == 0 else 'FAILED' }}
+
+      when: mcp_validate_claude_installation | default(true)
+      
+    - name: "{{ mcp_pre_task_get_servers_name | default('Get current MCP servers list') }}"
+      command: "{{ claude_cli_command }} {{ mcp_list_command | default('mcp list') }}"
+      register: current_servers
+      changed_when: false
+      ignore_errors: "{{ mcp_ignore_list_errors | default(true) }}"
+      when: mcp_get_current_servers | default(true)
+
+  # Main role execution (externalized and modular)
+  roles:
+    - role: "{{ mcp_config_role | default('mcp-config') }}"
+      when: mcp_execute_config_role | default(true)
+      delegate_to: "{{ mcp_config_delegate | default('localhost') }}"
+    - role: "{{ mcp_validation_role | default('mcp-validation') }}"
+      when: mcp_execute_validation_role | default(true)
+    - role: "{{ mcp_operations_role | default('mcp-operations') }}"
+      when: mcp_execute_operations_role | default(true)
+
+  # Post-execution summary (externalized)
+  post_tasks:
+    - name: "{{ mcp_post_task_summary_name | default('Display configuration summary') }}"
+      debug:
+        msg: "{{ mcp_summary_template | default(mcp_default_summary_template) }}"
+      when: mcp_show_summary | default(true)
+      vars:
+        mcp_default_summary_template: |
+          {{ mcp_completion_message | default('MCP servers configuration complete!') }}
+          
+          {{ mcp_scope_label | default('Scope') }}: {{ mcp_scope }}{% if mcp_scope == 'project' %} ({{ mcp_project_path }}){% endif %}
+          {{ mcp_mode_label | default('Mode') }}: {{ mcp_mode }}
+          {% if mcp_mode == 'individual' %}
+          {{ mcp_servers_label | default('Servers') }}: {{ mcp_servers_list }}
+          {% elif mcp_mode == 'group' %}
+          {{ mcp_group_label | default('Group') }}: {{ mcp_group }}
+          {% endif %}
+          
+          {{ mcp_config_loaded_label | default('Configuration loaded from') }}:
+          - {{ mcp_env_file_label | default('.env file') }}: {{ (env_file_stat.stat.exists | default(false)) | ternary(mcp_yes_label | default('Yes'), mcp_no_label | default('No')) }}
+          - {{ mcp_config_file_label | default('config.yml') }}: {{ (config_file_stat.stat.exists | default(false)) | ternary(mcp_yes_label | default('Yes'), mcp_no_label | default('No')) }}
+          
+          {{ mcp_verify_instruction | default('To verify configuration') }}:
+          {% if mcp_scope == 'user' %}
+          {{ claude_cli_command }} {{ mcp_list_user_command | default('mcp list -s user') }}
+          {% else %}
+          {{ mcp_cd_command | default('cd') }} {{ mcp_project_path }} && {{ claude_cli_command }} {{ mcp_list_project_command | default('mcp list') }}
+          {% endif %}

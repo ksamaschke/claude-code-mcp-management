@@ -1,0 +1,70 @@
+---
+# =============================================================================
+# MCP Config Role - Configuration Loading
+# =============================================================================
+# Load configuration files with externalized error handling
+# =============================================================================
+
+- name: "{{ mcp_config_load_backup_name | default('Backup existing configuration') }}"
+  copy:
+    src: "{{ item }}"
+    dest: "{{ item }}{{ mcp_backup_suffix | default('.backup') }}"
+    backup: "{{ mcp_config_backup_enabled | default(true) }}"
+  loop: "{{ mcp_found_config_files | default([]) }}"
+  when:
+    - mcp_config_backup_before_load | default(true)
+    - "mcp_found_config_files is defined"
+  ignore_errors: true
+
+- name: "{{ mcp_config_load_json_name | default('Load JSON configuration files') }}"
+  slurp:
+    src: "{{ item }}"
+  register: config_content
+  loop: "{{ mcp_found_config_files | default([]) }}"
+  when:
+    - "mcp_found_config_files is defined"
+    - "mcp_found_config_files | length > 0"
+  ignore_errors: true
+
+- name: "{{ mcp_config_load_env_name | default('Load environment files') }}"
+  slurp:
+    src: "{{ item }}"
+  register: env_content
+  loop: "{{ mcp_found_env_files | default([]) }}"
+  when:
+    - "mcp_found_env_files is defined"
+    - "mcp_found_env_files | length > 0"
+  ignore_errors: true
+
+- name: "{{ mcp_config_load_parse_name | default('Parse loaded configurations') }}"
+  set_fact:
+    mcp_parsed_configs: >-
+      {% set configs = [] -%}
+      {% for result in config_content.results | default([]) -%}
+        {% if result.content is defined -%}
+          {% set _ = configs.append(result.content | b64decode | from_json) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ configs }}
+    mcp_parsed_env: >-
+      {% set envs = {} -%}
+      {% for result in env_content.results | default([]) -%}
+        {% if result.content is defined -%}
+          {% for line in (result.content | b64decode).split('\n') -%}
+            {% if '=' in line and not line.startswith('#') -%}
+              {% set key_val = line.split('=', 1) -%}
+              {% set _ = envs.update({key_val[0].strip(): key_val[1].strip()}) -%}
+            {% endif -%}
+          {% endfor -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ envs }}
+  when: mcp_config_parser_enabled | default(true)
+
+- name: "{{ mcp_config_load_log_name | default('Log loaded configuration summary') }}"
+  debug:
+    msg: |
+      {{ mcp_config_load_summary_message | default('Configuration loading complete') }}:
+      {{ mcp_config_files_loaded_label | default('Config files loaded') }}: {{ mcp_parsed_configs | length | default(0) }}
+      {{ mcp_env_vars_loaded_label | default('Environment variables loaded') }}: {{ mcp_parsed_env | length | default(0) }}
+  when: mcp_config_logging_enabled | default(true)

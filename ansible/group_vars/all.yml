@@ -1,0 +1,319 @@
+---
+# =============================================================================
+# MCP Server Management - Clean Externalized Configuration
+# =============================================================================
+# All variables externalized - NO hardcoding in playbooks/roles
+# Variable hierarchy: ansible-playbook -e > host_vars/ > group_vars/ > defaults/
+# =============================================================================
+
+# Core Configuration
+# =============================================================================
+
+# Target host configuration
+mcp_target_host: "{{ target_host | default('localhost') }}"
+
+# Claude CLI configuration
+claude_cli_command: "{{ claude_command | default('claude') }}"
+
+# Default operation mode and scope
+mcp_default_scope: "{{ scope | default('user') }}"
+mcp_default_mode: "{{ mode | default('all') }}"
+mcp_default_project_path: "{{ project_path | default('') }}"
+
+# Server selection configuration
+mcp_default_servers_list: "{{ servers | default('') }}"
+mcp_default_group: "{{ group | default('') }}"
+
+# Operational flags
+mcp_dry_run_default: "{{ dry_run | default(false) }}"
+mcp_cleanup_orphaned_default: "{{ cleanup_orphaned | default(true) }}"
+mcp_backup_config_default: "{{ backup_config | default(true) }}"
+
+# Configuration file paths
+mcp_config_file_path: "{{ config_file | default('mcp-servers.json') }}"
+mcp_env_file_path: "{{ env_file | default('.env') }}"
+
+# Backup configuration
+mcp_backup_suffix: "{{ backup_suffix | default('.ansible-backup') }}"
+
+# NPM configuration
+mcp_npm_install_global: "{{ npm_global | default(false) }}"
+mcp_npm_prefix: "{{ npm_prefix | default(ansible_env.HOME + '/.npm-global') }}"
+
+# Shell command configuration
+mcp_default_shell_commands: "{{ shell_commands | default('ls,cat,pwd,grep,wc,find,echo,head,tail,sort,uniq,date,whoami,which,tree') }}"
+
+# Validation configuration
+mcp_validate_claude_installation: "{{ validate_claude | default(true) }}"
+mcp_validate_scope: "{{ validate_scope | default(true) }}"
+mcp_validate_project_path: "{{ validate_project_path | default(true) }}"
+
+# Display configuration
+mcp_show_summary: "{{ show_summary | default(true) }}"
+mcp_show_config_details: "{{ show_config_details | default(true) }}"
+
+# MCP Server Groups
+# =============================================================================
+mcp_server_groups:
+  development:
+    - git
+    - github
+    - gitlab
+    - puppeteer
+    - desktop-commander
+  
+  engineering:
+    # - ansible  # Use mcp-cli-adapter with ansible commands
+    - ssh
+    - filesystem
+    - mcp-cli-adapter
+  
+  documentation:
+    - markitdown
+    - pandoc
+    - memory
+    - Context7
+  
+  office:
+    # - pdf-tools  # Not available yet
+    - markitdown
+    - pandoc
+  
+  search:
+    - brave-search
+    - Context7
+  
+  core:
+    - memory
+    - sequential-thinking
+    - desktop-commander
+
+# MCP Server Configurations
+# =============================================================================
+# All servers use externalized variables for maximum flexibility
+# Each server can be enabled/disabled via mcp_servers_enabled variables
+mcp_servers:
+  brave-search:
+    enabled: "{{ mcp_servers_enabled.brave_search }}"
+    command: "{{ mcp_commands.brave_search | default('npx @modelcontextprotocol/server-brave-search') }}"
+    args: "{{ mcp_args.brave_search | default([]) }}"
+    env:
+      BRAVE_API_KEY: "{{ mcp_environment_mappings.api_keys.brave_search }}"
+    requires_env: "{{ mcp_required_env.brave_search | default(['BRAVE_API_KEY']) }}"
+
+  Context7:
+    enabled: "{{ mcp_servers_enabled.context7 }}"
+    command: "{{ mcp_commands.context7 | default('npx @upstash/context7-mcp@latest') }}"
+    args: "{{ mcp_args.context7 | default([]) }}"
+
+  puppeteer:
+    enabled: "{{ mcp_servers_enabled.puppeteer }}"
+    command: "{{ mcp_commands.puppeteer | default('npx @modelcontextprotocol/server-puppeteer') }}"
+    args: "{{ mcp_args.puppeteer | default([]) }}"
+
+  desktop-commander:
+    enabled: "{{ mcp_servers_enabled.desktop_commander }}"
+    command: "{{ mcp_commands.desktop_commander | default('npx @wonderwhy-er/desktop-commander') }}"
+    args: "{{ mcp_args.desktop_commander | default([]) }}"
+
+  sequential-thinking:
+    enabled: "{{ mcp_servers_enabled.sequential_thinking }}"
+    command: "{{ mcp_commands.sequential_thinking | default('npx @modelcontextprotocol/server-sequential-thinking') }}"
+    args: "{{ mcp_args.sequential_thinking | default([]) }}"
+
+  git:
+    enabled: "{{ mcp_servers_enabled.git }}"
+    command: "{{ mcp_commands.git | default('npx @cyanheads/git-mcp-server') }}"
+    args: "{{ mcp_args.git | default([]) }}"
+
+  github:
+    enabled: "{{ mcp_servers_enabled.github }}"
+    command: "{{ mcp_commands.github | default('npx @modelcontextprotocol/server-github') }}"
+    args: "{{ mcp_args.github | default([]) }}"
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "{{ mcp_environment_mappings.api_keys.github }}"
+    requires_env: "{{ mcp_required_env.github | default(['GITHUB_PERSONAL_ACCESS_TOKEN']) }}"
+
+  gitlab:
+    enabled: "{{ mcp_servers_enabled.gitlab }}"
+    command: "{{ mcp_commands.gitlab | default('npx @yoda.digital/gitlab-mcp-server') }}"
+    args: "{{ mcp_args.gitlab | default([]) }}"
+    env:
+      GITLAB_PERSONAL_ACCESS_TOKEN: "{{ mcp_environment_mappings.api_keys.gitlab }}"
+      GITLAB_API_URL: "{{ mcp_environment_mappings.urls.gitlab_api }}"
+    requires_env: "{{ mcp_required_env.gitlab | default(['GITLAB_PERSONAL_ACCESS_TOKEN']) }}"
+
+  markitdown:
+    enabled: "{{ mcp_servers_enabled.markitdown }}"
+    command: "{{ mcp_commands.markitdown | default('uvx') }}"
+    args: "{{ mcp_args.markitdown | default(['markitdown-mcp']) }}"
+
+  memory:
+    enabled: "{{ mcp_servers_enabled.memory }}"
+    command: "{{ mcp_commands.memory | default('npx @modelcontextprotocol/server-memory') }}"
+    args: "{{ mcp_args.memory | default([]) }}"
+
+  pandoc:
+    enabled: "{{ mcp_servers_enabled.pandoc }}"
+    command: "{{ mcp_commands.pandoc | default('uvx') }}"
+    args: "{{ mcp_args.pandoc | default(['mcp-pandoc']) }}"
+
+  filesystem:
+    enabled: "{{ mcp_servers_enabled.filesystem }}"
+    command: "{{ mcp_commands.filesystem | default('npx @modelcontextprotocol/server-filesystem') }}"
+    args: "{{ mcp_args.filesystem | default([]) }}"
+
+  mcp-cli-adapter:
+    enabled: "{{ mcp_servers_enabled.mcp_cli_adapter }}"
+    command: "{{ mcp_commands.mcp_cli_adapter | default('uvx') }}"
+    args: "{{ mcp_args.mcp_cli_adapter | default(['mcp-shell-server']) }}"
+    env:
+      ALLOW_COMMANDS: "{{ mcp_shell_configuration.allowed_commands }}"
+
+  ssh:
+    enabled: "{{ mcp_servers_enabled.ssh }}"
+    command: "{{ mcp_commands.ssh | default('npx @fangjunjie/ssh-mcp-server') }}"
+    args: "{{ mcp_args.ssh | default([]) }}"
+
+  # Optional/Example servers (disabled by default)
+  pdf-tools:
+    enabled: "{{ mcp_servers_enabled.pdf_tools }}"
+    command: "{{ mcp_commands.pdf_tools | default('npx @modelcontextprotocol/server-pdf-tools') }}"
+    args: "{{ mcp_args.pdf_tools | default([]) }}"
+
+  ansible:
+    enabled: "{{ mcp_servers_enabled.ansible }}"
+    command: "{{ mcp_commands.ansible | default('uvx') }}"
+    args: "{{ mcp_args.ansible | default(['mcp-shell-server']) }}"
+    env:
+      ALLOW_COMMANDS: "{{ mcp_ansible_commands | default('ansible,ansible-playbook,ansible-galaxy,ansible-vault') }}"
+
+# Advanced Configuration
+# =============================================================================
+
+# Project configuration - fully externalized
+mcp_project_configuration:
+  default_project_path: "{{ project_path | default(ansible_env.HOME + '/Work') }}"
+  claude_config_path: "{{ claude_config_path | default(ansible_env.HOME + '/.claude') }}"
+  project_claude_config: "{{ project_claude_config | default('claude_desktop_config.json') }}"
+  user_claude_config: "{{ user_claude_config | default(ansible_env.HOME + '/.claude/claude_desktop_config.json') }}"
+
+# Backup configuration - externalized
+mcp_backup_configuration:
+  enabled: "{{ backup_claude_config | default(true) }}"
+  suffix: "{{ backup_suffix | default('.ansible-backup') }}"
+  keep_backups: "{{ keep_backups | default(3) }}"
+  backup_directory: "{{ backup_directory | default(ansible_env.HOME + '/.claude/backups') }}"
+
+# NPM configuration - externalized  
+mcp_npm_configuration:
+  install_global: "{{ npm_install_global | default(false) }}"
+  prefix: "{{ npm_prefix | default(ansible_env.HOME + '/.npm-global') }}"
+  cache_directory: "{{ npm_cache_dir | default(ansible_env.HOME + '/.npm-cache') }}"
+  registry: "{{ npm_registry | default('https://registry.npmjs.org/') }}"
+
+# Disabled servers configuration - externalized
+mcp_disabled_servers_config:
+  servers: "{{ mcp_disabled_servers | default([]) }}"
+  auto_cleanup: "{{ auto_cleanup_disabled | default(true) }}"
+  disable_on_error: "{{ disable_on_error | default(false) }}"
+
+# Shell commands configuration - externalized
+mcp_shell_configuration:
+  allowed_commands: "{{ shell_allowed_commands | default(mcp_default_shell_commands) }}"
+  restricted_commands: "{{ shell_restricted_commands | default([]) }}"
+  command_timeout: "{{ command_timeout | default(30) }}"
+  enable_sudo: "{{ enable_sudo | default(false) }}"
+
+# Environment Variable Mappings
+# =============================================================================
+# Centralized mapping of environment variables to avoid hardcoding
+mcp_environment_mappings:
+  api_keys:
+    brave_search: "{{ brave_api_key | default(lookup('env', 'BRAVE_API_KEY')) }}"
+    github: "{{ github_pat | default(lookup('env', 'GITHUB_PAT')) }}"
+    gitlab: "{{ gitlab_pat | default(lookup('env', 'GITLAB_PAT')) }}"
+    docker_api: "{{ docker_api_key | default(lookup('env', 'DOCKER_API_KEY')) }}"
+  
+  urls:
+    gitlab_api: "{{ gitlab_url | default(lookup('env', 'GITLAB_URL')) | default('https://gitlab.com/api/v4') }}"
+    github_api: "{{ github_url | default(lookup('env', 'GITHUB_URL')) | default('https://api.github.com') }}"
+  
+  paths:
+    config_directory: "{{ config_dir | default(lookup('env', 'CONFIG_DIR')) | default('/path/to/config') }}"
+    custom_binary: "{{ custom_binary_path | default(lookup('env', 'CUSTOM_BINARY_PATH')) | default('/usr/local/bin/mcp-custom-server') }}"
+    source_script: "{{ source_script_path | default(lookup('env', 'SOURCE_SCRIPT_PATH')) | default(ansible_env.HOME + '/projects/my-mcp-server/index.js') }}"
+
+# Server Enable/Disable Configuration
+# =============================================================================
+# Centralized server state management
+mcp_servers_enabled:
+  brave_search: "{{ enable_brave_search | default(true) }}"
+  context7: "{{ enable_context7 | default(true) }}"
+  puppeteer: "{{ enable_puppeteer | default(true) }}"
+  desktop_commander: "{{ enable_desktop_commander | default(true) }}"
+  sequential_thinking: "{{ enable_sequential_thinking | default(true) }}"
+  git: "{{ enable_git | default(true) }}"
+  github: "{{ enable_github | default(true) }}"
+  gitlab: "{{ enable_gitlab | default(true) }}"
+  markitdown: "{{ enable_markitdown | default(true) }}"
+  memory: "{{ enable_memory | default(true) }}"
+  pandoc: "{{ enable_pandoc | default(true) }}"
+  filesystem: "{{ enable_filesystem | default(true) }}"
+  mcp_cli_adapter: "{{ enable_mcp_cli_adapter | default(true) }}"
+  ssh: "{{ enable_ssh | default(true) }}"
+  # Examples
+  pdf_tools: "{{ enable_pdf_tools | default(false) }}"
+  ansible: "{{ enable_ansible | default(false) }}"
+  docker_example: "{{ enable_docker_example | default(false) }}"
+  python_example: "{{ enable_python_example | default(false) }}"
+  binary_example: "{{ enable_binary_example | default(false) }}"
+  source_example: "{{ enable_source_example | default(false) }}"
+  uv_python_example: "{{ enable_uv_python_example | default(false) }}"
+
+# Example Server Configurations
+# =============================================================================
+# Templated examples showing different deployment patterns
+mcp_server_examples:
+  # Docker-based server
+  docker-example:
+    enabled: false
+    command: "docker"
+    args:
+      - "run"
+      - "--rm"
+      - "-i"
+      - "myorg/mcp-server:latest"
+    env:
+      API_KEY: "{{ docker_api_key | default('') }}"
+  
+  # Python-based server
+  python-example:
+    enabled: false
+    command: "python"
+    args:
+      - "-m"
+      - "mcp_server_module"
+    env:
+      CONFIG_PATH: "/path/to/config"
+  
+  # Binary executable
+  binary-example:
+    enabled: false
+    command: "/usr/local/bin/mcp-custom-server"
+    args:
+      - "--mode=stdio"
+  
+  # Source-based (requires path to script)
+  source-example:
+    enabled: false
+    command: "node"
+    args:
+      - "/home/user/projects/my-mcp-server/index.js"
+  
+  # UV-based Python server
+  uv-python-example:
+    enabled: false
+    command: "uvx"
+    args:
+      - "mcp-server-package"

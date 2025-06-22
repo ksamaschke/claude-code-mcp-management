@@ -1,0 +1,49 @@
+---
+# =============================================================================
+# MCP Config Role - Default Variables
+# =============================================================================
+# Lowest priority variables - can be overridden by group_vars/ or host_vars/
+# =============================================================================
+
+# Configuration loading defaults
+mcp_config_loader_enabled: true
+mcp_config_loader_name: "Load MCP configuration files"
+
+# Configuration file discovery
+mcp_config_file_discovery_enabled: true
+mcp_config_file_patterns:
+  - "mcp-servers.json"
+  - "{{ ansible_env.HOME }}/.mcp-servers.json"
+  - "config/mcp-servers.json"
+
+# Environment file discovery  
+mcp_env_file_discovery_enabled: true
+mcp_env_file_patterns:
+  - ".env"
+  - "{{ ansible_env.HOME }}/.env"
+  - "config/.env"
+
+# Configuration validation
+mcp_config_validation_enabled: true
+mcp_config_validation_strict: false
+
+# Configuration parsing
+mcp_config_parser_enabled: true
+mcp_config_parser_format: "json"
+mcp_config_parser_encoding: "utf-8"
+
+# Configuration caching
+mcp_config_cache_enabled: false
+mcp_config_cache_ttl: 300
+
+# Configuration backup
+mcp_config_backup_enabled: true
+mcp_config_backup_before_load: true
+
+# Error handling
+mcp_config_error_handling: "warn"  # Options: fail, warn, ignore
+mcp_config_continue_on_error: true
+
+# Logging
+mcp_config_logging_enabled: true
+mcp_config_logging_level: "info"

@@ -1,0 +1,91 @@
+---
+# =============================================================================
+# MCP Config Role - Configuration Parsing
+# =============================================================================
+# Parse and transform configuration with externalized logic
+# =============================================================================
+
+- name: "{{ mcp_config_parse_merge_name | default('Merge configuration sources') }}"
+  set_fact:
+    mcp_merged_config: >-
+      {% set merged = {} -%}
+      {% for config in mcp_parsed_configs | default([]) -%}
+        {% set _ = merged.update(config) -%}
+      {% endfor -%}
+      {% if mcp_parsed_env is defined -%}
+        {% set _ = merged.update({'environment': mcp_parsed_env}) -%}
+      {% endif -%}
+      {{ merged }}
+
+- name: "{{ mcp_config_parse_transform_name | default('Transform server configurations') }}"
+  set_fact:
+    mcp_transformed_servers: >-
+      {% set transformed = {} -%}
+      {% for server_name, server_config in (mcp_merged_config.mcpServers | default({})).items() -%}
+        {% set server_data = server_config.copy() -%}
+        {% if server_config.env is defined -%}
+          {% set env_resolved = {} -%}
+          {% for env_key, env_val in server_config.env.items() -%}
+            {% set resolved_val = env_val -%}
+            {% if mcp_parsed_env is defined and env_val.startswith('{{') and env_val.endswith('}}') -%}
+              {% set env_lookup = env_val[2:-2].strip() -%}
+              {% if env_lookup in mcp_parsed_env -%}
+                {% set resolved_val = mcp_parsed_env[env_lookup] -%}
+              {% endif -%}
+            {% endif -%}
+            {% set _ = env_resolved.update({env_key: resolved_val}) -%}
+          {% endfor -%}
+          {% set _ = server_data.update({'env': env_resolved}) -%}
+        {% endif -%}
+        {% set _ = transformed.update({server_name: server_data}) -%}
+      {% endfor -%}
+      {{ transformed }}
+
+- name: "{{ mcp_config_parse_filter_name | default('Filter enabled servers') }}"
+  set_fact:
+    mcp_enabled_servers: >-
+      {% set enabled = {} -%}
+      {% for server_name, server_config in mcp_transformed_servers.items() -%}
+        {% if server_config.enabled | default(true) | bool -%}
+          {% set _ = enabled.update({server_name: server_config}) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ enabled }}
+
+- name: "{{ mcp_config_parse_groups_name | default('Process server groups') }}"
+  set_fact:
+    mcp_processed_groups: >-
+      {% set processed = {} -%}
+      {% for group_name, server_list in mcp_server_groups.items() | default([]) -%}
+        {% set group_servers = [] -%}
+        {% for server_name in server_list -%}
+          {% if server_name in mcp_enabled_servers -%}
+            {% set _ = group_servers.append(server_name) -%}
+          {% endif -%}
+        {% endfor -%}
+        {% set _ = processed.update({group_name: group_servers}) -%}
+      {% endfor -%}
+      {{ processed }}
+  when: mcp_server_groups is defined
+
+- name: "{{ mcp_config_parse_default_groups_name | default('Set default server groups') }}"
+  set_fact:
+    mcp_processed_groups: {}
+  when: mcp_server_groups is not defined
+
+- name: "{{ mcp_config_parse_validation_name | default('Validate parsed configuration') }}"
+  assert:
+    that:
+      - mcp_enabled_servers | length > 0
+    fail_msg: "{{ mcp_config_parse_no_servers_msg | default('No enabled servers found after parsing') }}"
+    success_msg: "{{ mcp_config_parse_servers_found_msg | default('Enabled servers found') }}: {{ mcp_enabled_servers.keys() | list }}"
+  when: mcp_config_parse_require_servers | default(true)
+
+- name: "{{ mcp_config_parse_log_name | default('Log parsing results') }}"
+  debug:
+    msg: |
+      {{ mcp_config_parse_summary_message | default('Configuration parsing complete') }}:
+      {{ mcp_enabled_servers_label | default('Enabled servers') }}: {{ mcp_enabled_servers.keys() | list }}
+      {{ mcp_server_groups_label | default('Server groups') }}: {{ mcp_processed_groups.keys() | list }}
+      {{ mcp_total_configs_label | default('Total configurations merged') }}: {{ mcp_parsed_configs | length | default(0) }}
+  when: mcp_config_logging_enabled | default(true)

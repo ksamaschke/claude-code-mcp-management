@@ -1,0 +1,138 @@
+---
+# =============================================================================
+# MCP Operations Role - Execute Operations
+# =============================================================================
+# Execute MCP server operations with externalized commands and error handling
+# =============================================================================
+
+- name: "{{ mcp_operation_execute_sync_name | default('Execute sync operation') }}"
+  include_tasks: sync-operations.yml
+  when:
+    - mcp_operation_mode == 'sync'
+    - not mcp_operation_parallel_enabled
+
+- name: "{{ mcp_operation_execute_individual_name | default('Execute individual server operations') }}"
+  command: >-
+    {% if mcp_operation_context.requires_servers %}
+      {% if mcp_operation_mode == 'add' %}
+    {{ mcp_operation_context.command_base }} {{ item }} '{{ mcp_enabled_servers[item] | to_json }}' {{ mcp_operation_context.scope_flag }} {{ mcp_operation_context.flags }}
+      {% else %}
+    {{ mcp_operation_context.command_base }} {{ item }} {{ mcp_operation_context.scope_flag }} {{ mcp_operation_context.flags }}
+      {% endif %}
+    {% else %}
+      {% if mcp_operation_mode == 'list' %}
+    {{ mcp_operation_context.command_base }} {{ mcp_operation_context.flags }}
+      {% else %}
+    {{ mcp_operation_context.command_base }} {{ mcp_operation_context.scope_flag }} {{ mcp_operation_context.flags }}
+      {% endif %}
+    {% endif %}
+  args:
+    chdir: "{{ mcp_operation_context.working_dir }}"
+  register: server_operation_results
+  loop: "{{ mcp_servers_to_operate if mcp_operation_context.requires_servers else [''] }}"
+  timeout: "{{ mcp_command_timeout }}"
+  retries: "{{ mcp_command_retries }}"
+  delay: "{{ mcp_command_delay }}"
+  ignore_errors: "{{ mcp_operation_continue_on_error }}"
+  when:
+    - "mcp_servers_to_operate | length > 0 or not mcp_operation_context.requires_servers"
+    - not mcp_operation_parallel_enabled
+    - mcp_operation_mode != 'sync'
+
+- name: "{{ mcp_operation_execute_sync_parallel_name | default('Execute sync operation (parallel)') }}"
+  include_tasks: sync-operations.yml
+  when:
+    - mcp_operation_mode == 'sync'
+    - mcp_operation_parallel_enabled
+
+- name: "{{ mcp_operation_execute_parallel_name | default('Execute parallel server operations') }}"
+  command: >-
+    {% if mcp_operation_context.requires_servers %}
+      {% if mcp_operation_mode == 'add' %}
+    {{ mcp_operation_context.command_base }} {{ item }} '{{ mcp_enabled_servers[item] | to_json }}' {{ mcp_operation_context.scope_flag }} {{ mcp_operation_context.flags }}
+      {% else %}
+    {{ mcp_operation_context.command_base }} {{ item }} {{ mcp_operation_context.scope_flag }} {{ mcp_operation_context.flags }}
+      {% endif %}
+    {% else %}
+      {% if mcp_operation_mode == 'list' %}
+    {{ mcp_operation_context.command_base }} {{ mcp_operation_context.flags }}
+      {% else %}
+    {{ mcp_operation_context.command_base }} {{ mcp_operation_context.scope_flag }} {{ mcp_operation_context.flags }}
+      {% endif %}
+    {% endif %}
+  args:
+    chdir: "{{ mcp_operation_context.working_dir }}"
+  register: server_operation_parallel_results
+  loop: "{{ mcp_servers_to_operate if mcp_operation_context.requires_servers else [''] }}"
+  timeout: "{{ mcp_command_timeout }}"
+  retries: "{{ mcp_command_retries }}"
+  delay: "{{ mcp_command_delay }}"
+  ignore_errors: "{{ mcp_operation_continue_on_error }}"
+  async: "{{ mcp_operation_async_timeout | default(300) }}"
+  poll: "{{ mcp_operation_poll_interval | default(0) }}"
+  when:
+    - "mcp_servers_to_operate | length > 0 or not mcp_operation_context.requires_servers"
+    - mcp_operation_parallel_enabled
+    - mcp_operation_mode != 'sync'
+
+- name: "{{ mcp_operation_execute_wait_parallel_name | default('Wait for parallel operations to complete') }}"
+  async_status:
+    jid: "{{ item.ansible_job_id }}"
+  register: parallel_wait_results
+  loop: "{{ server_operation_parallel_results.results | default([]) }}"
+  until: item.finished
+  retries: "{{ mcp_operation_parallel_wait_retries | default(60) }}"
+  delay: "{{ mcp_operation_parallel_wait_delay | default(5) }}"
+  when:
+    - mcp_operation_parallel_enabled
+    - "server_operation_parallel_results is defined"
+
+- name: "{{ mcp_operation_execute_log_name | default('Log operation results') }}"
+  debug:
+    msg: |
+      {{ mcp_operation_execute_log_message | default('Operation executed') }} {{ item.item }}: 
+      {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}
+      {% if mcp_operation_log_output and item.stdout is defined and item.stdout != '' %}
+      {{ mcp_operation_execute_output_label | default('Output') }}: {{ item.stdout }}
+      {% endif %}
+      {% if mcp_operation_log_errors and item.stderr is defined and item.stderr != '' %}
+      {{ mcp_operation_execute_error_label | default('Error') }}: {{ item.stderr }}
+      {% endif %}
+  loop: >-
+    {% if mcp_operation_parallel_enabled -%}
+      {{ parallel_wait_results.results | default([]) }}
+    {%- else -%}
+      {{ server_operation_results.results | default([]) }}
+    {%- endif %}
+  when: mcp_operation_log_commands
+
+- name: "{{ mcp_operation_execute_collect_errors_name | default('Collect operation errors') }}"
+  set_fact:
+    mcp_operation_errors: >-
+      {% set errors = [] -%}
+      {% set results = parallel_wait_results.results if mcp_operation_parallel_enabled else server_operation_results.results -%}
+      {% for result in results | default([]) -%}
+        {% if result.rc != 0 -%}
+          {% set _ = errors.append({'server': result.item, 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
+        {% endif -%}
+      {% endfor -%}
+      {{ errors }}
+  when: mcp_operation_collect_errors
+
+- name: "{{ mcp_operation_execute_fail_threshold_name | default('Check failure threshold') }}"
+  set_fact:
+    mcp_operation_failure_rate: >-
+      {% set total_ops = mcp_servers_to_operate | length if mcp_servers_to_operate is defined else 1 -%}
+      {% set total_errors = mcp_operation_errors | length if mcp_operation_errors is defined else 0 -%}
+      {{ (total_errors / total_ops * 100) | round(2) if total_ops > 0 else 0 }}
+  when: mcp_operation_collect_errors
+
+- name: "{{ mcp_operation_execute_threshold_assert_name | default('Assert failure threshold not exceeded') }}"
+  assert:
+    that:
+      - "{{ mcp_operation_failure_rate | float <= mcp_operation_fail_threshold | float }}"
+    fail_msg: "{{ mcp_operation_execute_threshold_fail_msg | default('Operation failure rate exceeded threshold') }}: {{ mcp_operation_failure_rate }}% > {{ mcp_operation_fail_threshold }}%"
+    success_msg: "{{ mcp_operation_execute_threshold_success_msg | default('Operation failure rate within threshold') }}: {{ mcp_operation_failure_rate }}%"
+  when:
+    - mcp_operation_collect_errors
+    - mcp_operation_enforce_threshold | default(false)

@@ -1,0 +1,34 @@
+---
+# =============================================================================
+# MCP Validation Role - Main Tasks
+# =============================================================================
+# Environment validation with fully externalized checks
+# =============================================================================
+
+- name: "{{ mcp_validation_task_cli_name | default('Validate CLI tools') }}"
+  include_tasks: "{{ mcp_validation_cli_task_file | default('validate-cli.yml') }}"
+  when: mcp_validate_cli_tools_enabled | default(true)
+
+- name: "{{ mcp_validation_task_env_name | default('Validate environment') }}"
+  include_tasks: "{{ mcp_validation_env_task_file | default('validate-environment.yml') }}"
+  when: mcp_validate_environment_enabled | default(true)
+
+- name: "{{ mcp_validation_task_permissions_name | default('Validate permissions') }}"
+  include_tasks: "{{ mcp_validation_permissions_task_file | default('validate-permissions.yml') }}"
+  when: mcp_validate_permissions_enabled | default(true)
+
+- name: "{{ mcp_validation_task_paths_name | default('Validate paths') }}"
+  include_tasks: "{{ mcp_validation_paths_task_file | default('validate-paths.yml') }}"
+  when: mcp_validate_paths_enabled | default(true)
+
+- name: "{{ mcp_validation_task_network_name | default('Validate network') }}"
+  include_tasks: "{{ mcp_validation_network_task_file | default('validate-network.yml') }}"
+  when: mcp_validate_network_enabled | default(false)
+
+- name: "{{ mcp_validation_task_resources_name | default('Validate resources') }}"
+  include_tasks: "{{ mcp_validation_resources_task_file | default('validate-resources.yml') }}"
+  when: mcp_validate_resources_enabled | default(false)
+
+- name: "{{ mcp_validation_task_summary_name | default('Validation summary') }}"  
+  include_tasks: "{{ mcp_validation_summary_task_file | default('validation-summary.yml') }}"
+  when: mcp_validation_show_summary | default(true)

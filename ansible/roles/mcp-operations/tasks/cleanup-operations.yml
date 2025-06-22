@@ -1,0 +1,72 @@
+---
+# =============================================================================
+# MCP Operations Role - Cleanup Operations
+# =============================================================================
+# Cleanup after MCP operations with externalized configuration
+# =============================================================================
+
+- name: "{{ mcp_cleanup_orphaned_name | default('Clean up orphaned server references') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.list }} --check-orphaned"
+  register: mcp_orphaned_check
+  failed_when: false
+  changed_when: false
+  when: mcp_cleanup_orphaned_servers
+
+- name: "{{ mcp_cleanup_disabled_name | default('Clean up disabled servers') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.status }} --disabled-only"
+  register: mcp_disabled_check
+  failed_when: false
+  changed_when: false
+  when: mcp_cleanup_disabled_servers
+
+- name: "{{ mcp_cleanup_temp_files_name | default('Clean up temporary files') }}"
+  find:
+    paths: "{{ mcp_temp_directory | default('/tmp') }}"
+    patterns: "mcp-*"
+    age: "{{ mcp_cleanup_temp_age | default('1d') }}"
+  register: mcp_temp_files
+  when: mcp_cleanup_temp_files | default(true)
+
+- name: "{{ mcp_cleanup_remove_temp_name | default('Remove old temporary files') }}"
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ mcp_temp_files.files | default([]) }}"
+  when: 
+    - mcp_cleanup_temp_files | default(true)
+    - mcp_temp_files is defined
+
+- name: "{{ mcp_cleanup_old_backups_name | default('Clean up old backup files') }}"
+  find:
+    paths: "{{ mcp_backup_directory | default(ansible_env.HOME + '/.claude/backups') }}"
+    patterns: "mcp-config-backup-*.json"
+    age: "{{ mcp_cleanup_backup_age | default('7d') }}"
+  register: mcp_old_backups
+  when: mcp_cleanup_backup_files
+
+- name: "{{ mcp_cleanup_remove_backups_name | default('Remove old backup files') }}"
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ mcp_old_backups.files | default([]) }}"
+  when: 
+    - mcp_cleanup_backup_files
+    - mcp_old_backups is defined
+
+- name: "{{ mcp_cleanup_reset_vars_name | default('Reset operation variables') }}"
+  set_fact:
+    mcp_cleanup_results:
+      orphaned_cleaned: "{{ mcp_orphaned_check.rc == 0 if mcp_orphaned_check is defined else false }}"
+      disabled_cleaned: "{{ mcp_disabled_check.rc == 0 if mcp_disabled_check is defined else false }}"
+      temp_files_removed: "{{ mcp_temp_files.matched | default(0) }}"
+      backups_removed: "{{ mcp_old_backups.matched | default(0) }}"
+
+- name: "{{ mcp_cleanup_log_name | default('Log cleanup results') }}"
+  debug:
+    msg: |
+      {{ mcp_cleanup_log_message | default('Cleanup operations complete') }}:
+      - {{ mcp_cleanup_orphaned_label | default('Orphaned servers cleaned') }}: {{ mcp_cleanup_results.orphaned_cleaned }}
+      - {{ mcp_cleanup_disabled_label | default('Disabled servers cleaned') }}: {{ mcp_cleanup_results.disabled_cleaned }}
+      - {{ mcp_cleanup_temp_label | default('Temp files removed') }}: {{ mcp_cleanup_results.temp_files_removed }}
+      - {{ mcp_cleanup_backups_label | default('Old backups removed') }}: {{ mcp_cleanup_results.backups_removed }}
+  when: mcp_cleanup_log_results | default(true)

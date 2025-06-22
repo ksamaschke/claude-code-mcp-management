@@ -1,0 +1,34 @@
+---
+# =============================================================================
+# MCP Operations Role - Main Tasks
+# =============================================================================
+# Execute MCP server operations with fully externalized commands
+# =============================================================================
+
+- name: "{{ mcp_operation_task_prepare_name | default('Prepare for operations') }}"
+  include_tasks: "{{ mcp_operation_prepare_task_file | default('prepare-operations.yml') }}"
+  when: mcp_operation_prepare_enabled | default(true)
+
+- name: "{{ mcp_operation_task_validate_name | default('Pre-operation validation') }}"
+  include_tasks: "{{ mcp_operation_validate_task_file | default('validate-operations.yml') }}"
+  when: mcp_operation_validate_before
+
+- name: "{{ mcp_operation_task_backup_name | default('Backup current configuration') }}"
+  include_tasks: "{{ mcp_operation_backup_task_file | default('backup-config.yml') }}"
+  when: mcp_server_backup_before_change
+
+- name: "{{ mcp_operation_task_execute_name | default('Execute operations') }}"
+  include_tasks: "{{ mcp_operation_execute_task_file | default('execute-operations.yml') }}"
+  when: mcp_server_operation_enabled
+
+- name: "{{ mcp_operation_task_cleanup_name | default('Cleanup operations') }}"
+  include_tasks: "{{ mcp_operation_cleanup_task_file | default('cleanup-operations.yml') }}"
+  when: mcp_cleanup_operation_enabled
+
+- name: "{{ mcp_operation_task_post_validate_name | default('Post-operation validation') }}"
+  include_tasks: "{{ mcp_operation_post_validate_task_file | default('post-validate-operations.yml') }}"
+  when: mcp_operation_validate_after
+
+- name: "{{ mcp_operation_task_summary_name | default('Operations summary') }}"
+  include_tasks: "{{ mcp_operation_summary_task_file | default('operations-summary.yml') }}"
+  when: mcp_operation_show_summary | default(true)

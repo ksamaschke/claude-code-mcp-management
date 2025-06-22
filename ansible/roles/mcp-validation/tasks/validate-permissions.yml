@@ -1,0 +1,44 @@
+---
+# =============================================================================
+# MCP Validation Role - Permissions Validation
+# =============================================================================
+# Validate file and directory permissions with externalized checks
+# =============================================================================
+
+- name: "{{ mcp_validate_config_readable_name | default('Validate configuration files are readable') }}"
+  stat:
+    path: "{{ item }}"
+  register: config_readable_stat
+  loop: "{{ mcp_config_files_to_validate | default([]) }}"
+  when: mcp_validate_permissions_config_readable
+
+- name: "{{ mcp_validate_config_readable_assert_name | default('Assert configuration files readable') }}"
+  assert:
+    that:
+      - item.stat.exists
+      - item.stat.readable
+    fail_msg: "{{ mcp_validate_config_readable_fail_msg | default('Configuration file not readable') }}: {{ item.item }}"
+    success_msg: "{{ mcp_validate_config_readable_success_msg | default('Configuration file readable') }}: {{ item.item }}"
+  loop: "{{ config_readable_stat.results | default([]) }}"
+  when:
+    - mcp_validate_permissions_config_readable
+    - "config_readable_stat is defined"
+
+- name: "{{ mcp_validate_executable_permissions_name | default('Validate executable permissions') }}"
+  stat:
+    path: "{{ item }}"
+  register: executable_permissions_stat
+  loop: "{{ mcp_executables_to_validate | default([]) }}"
+  when: mcp_validate_executable_permissions_enabled | default(false)
+
+- name: "{{ mcp_validate_executable_permissions_assert_name | default('Assert executables have correct permissions') }}"
+  assert:
+    that:
+      - item.stat.exists
+      - item.stat.executable
+    fail_msg: "{{ mcp_validate_executable_permissions_fail_msg | default('Executable lacks execute permission') }}: {{ item.item }}"
+    success_msg: "{{ mcp_validate_executable_permissions_success_msg | default('Executable permissions correct') }}: {{ item.item }}"
+  loop: "{{ executable_permissions_stat.results | default([]) }}"
+  when:
+    - mcp_validate_executable_permissions_enabled | default(false)
+    - "executable_permissions_stat is defined"

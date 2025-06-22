@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: mcp-validation
+  namespace: mcp
+  author: MCP Management System
+  description: Environment and system validation for MCP server management with fully externalized variables
+  company: ""
+  license: MIT
+  min_ansible_version: "2.9"
+  
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+  
+  galaxy_tags:
+    - mcp
+    - validation
+    - environment
+    - claude
+
+dependencies: []

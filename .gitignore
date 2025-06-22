@@ -1,27 +1,40 @@
-# Sensitive files
-.mcp.json
+# Environment files (containing secrets)
+.env
+.env.*
 *.env
 *.env.*
 .env.local
 .env.production
 .env.development
 
-# API Keys and tokens
-*token*
-*key*
-*secret*
-*auth*
-*pat*
+# MCP configuration files (auto-generated)
+.mcp.json
 
-# Claude settings
-.claude/settings.local.json
+# Claude settings and files
+.claude/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
 
 # Node modules
 node_modules/
 
-# Logs
+# Logs and test artifacts
 *.log
 logs/
+*test*.log
+*integration*.log
+*debug*.log
+test-*.yml
+temp_*.json
+INTEGRATION_TEST_REPORT.md
+
+# Backup files
+*.backup
+*.ansible-backup
+*~
 
 # OS files
 .DS_Store

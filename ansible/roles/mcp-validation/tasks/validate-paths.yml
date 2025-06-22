@@ -1,0 +1,52 @@
+---
+# =============================================================================
+# MCP Validation Role - Paths Validation
+# =============================================================================
+# Validate required paths exist with externalized path lists
+# =============================================================================
+
+- name: "{{ mcp_validate_required_paths_name | default('Validate required paths exist') }}"
+  stat:
+    path: "{{ item }}"
+  register: required_paths_stat
+  loop: "{{ mcp_required_paths | default([]) }}"
+  when: "mcp_required_paths is defined and mcp_required_paths | length > 0"
+
+- name: "{{ mcp_validate_required_paths_assert_name | default('Assert required paths exist') }}"
+  assert:
+    that:
+      - item.stat.exists
+    fail_msg: "{{ mcp_validate_required_paths_fail_msg | default('Required path does not exist') }}: {{ item.item }}"
+    success_msg: "{{ mcp_validate_required_paths_success_msg | default('Required path exists') }}: {{ item.item }}"
+  loop: "{{ required_paths_stat.results | default([]) }}"
+  when:
+    - "required_paths_stat is defined"
+    - not mcp_validate_paths_create_missing
+
+- name: "{{ mcp_validate_create_missing_paths_name | default('Create missing required paths') }}"
+  file:
+    path: "{{ item.item }}"
+    state: directory
+    mode: "{{ mcp_created_directory_mode | default('0755') }}"
+  loop: "{{ required_paths_stat.results | default([]) }}"
+  when:
+    - "required_paths_stat is defined"
+    - mcp_validate_paths_create_missing
+    - "not item.stat.exists"
+
+- name: "{{ mcp_validate_optional_paths_name | default('Check optional paths') }}"
+  stat:
+    path: "{{ item }}"
+  register: optional_paths_stat
+  loop: "{{ mcp_optional_paths | default([]) }}"
+  when: "mcp_optional_paths is defined and mcp_optional_paths | length > 0"
+
+- name: "{{ mcp_validate_optional_paths_log_name | default('Log optional paths status') }}"
+  debug:
+    msg: |
+      {{ mcp_validate_optional_paths_message | default('Optional path') }} {{ item.item }}: 
+      {{ 'EXISTS' if item.stat.exists else 'MISSING' }}
+  loop: "{{ optional_paths_stat.results | default([]) }}"
+  when:
+    - "optional_paths_stat is defined"
+    - mcp_validation_log_level | default('info') in ['debug', 'info']

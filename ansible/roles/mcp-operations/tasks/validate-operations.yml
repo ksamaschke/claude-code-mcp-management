@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# MCP Operations Role - Validate Operations
+# =============================================================================
+# Pre-operation validation with externalized configuration
+# =============================================================================
+
+- name: "{{ mcp_operation_validate_connection_name | default('Validate Claude CLI connection') }}"
+  command: "{{ claude_cli_command }} {{ mcp_claude_commands.status }}"
+  register: mcp_cli_status_check
+  failed_when: false
+  changed_when: false
+  when: mcp_operation_validate_cli_connection | default(true)
+
+- name: "{{ mcp_operation_validate_scope_name | default('Validate operation scope') }}"
+  assert:
+    that:
+      - mcp_operation_scope in ['user', 'project']
+      - mcp_operation_scope is defined
+    fail_msg: "{{ mcp_operation_validate_scope_fail_msg | default('Invalid operation scope. Must be user or project.') }}"
+    success_msg: "{{ mcp_operation_validate_scope_success_msg | default('Operation scope validated') }}"
+  when: mcp_operation_validate_scope_check | default(true)
+
+- name: "{{ mcp_operation_validate_working_dir_name | default('Validate working directory') }}"
+  stat:
+    path: "{{ mcp_operation_working_dir }}"
+  register: working_dir_stat
+  when: mcp_operation_validate_working_dir | default(true)
+
+- name: "{{ mcp_operation_validate_working_dir_assert_name | default('Assert working directory exists') }}"
+  assert:
+    that:
+      - working_dir_stat.stat.exists
+      - working_dir_stat.stat.isdir
+    fail_msg: "{{ mcp_operation_validate_working_dir_fail_msg | default('Working directory does not exist or is not a directory') }}"
+    success_msg: "{{ mcp_operation_validate_working_dir_success_msg | default('Working directory validated') }}"
+  when: 
+    - mcp_operation_validate_working_dir | default(true)
+    - working_dir_stat is defined
+
+- name: "{{ mcp_operation_validate_servers_name | default('Validate servers selection') }}"
+  assert:
+    that:
+      - mcp_servers_to_operate is defined
+      - >
+        (mcp_servers_to_operate | length > 0 and mcp_operation_mode in mcp_operations_requiring_servers) or
+        mcp_operation_mode in mcp_operations_no_servers_required
+    fail_msg: >
+      {{ mcp_operation_validate_servers_fail_msg | default('Invalid server selection for operation') }}:
+      Operation '{{ mcp_operation_mode }}' requires servers but none selected
+    success_msg: "{{ mcp_operation_validate_servers_success_msg | default('Server selection validated') }}"
+  when: mcp_operation_validate_servers_selection | default(true)
+
+- name: "{{ mcp_operation_validate_log_name | default('Log validation results') }}"
+  debug:
+    msg: |
+      {{ mcp_operation_validate_log_message | default('Pre-operation validation complete') }}:
+      - {{ mcp_operation_validate_cli_label | default('CLI Status') }}: {{ 'PASSED' if (mcp_cli_status_check.rc == 0 if mcp_cli_status_check is defined else false) else 'FAILED' }}
+      - {{ mcp_operation_validate_scope_label | default('Scope') }}: {{ mcp_operation_scope }}
+      - {{ mcp_operation_validate_working_dir_label | default('Working Dir') }}: {{ mcp_operation_working_dir }}
+      - {{ mcp_operation_validate_servers_count_label | default('Servers Count') }}: {{ mcp_servers_to_operate | length if mcp_servers_to_operate is defined else 0 }}
+      - {{ mcp_operation_validate_mode_label | default('Operation Mode') }}: {{ mcp_operation_mode }}
+      - {{ mcp_operation_validate_servers_required_label | default('Servers Required') }}: {{ mcp_operation_mode in mcp_operations_requiring_servers }}
+  when: mcp_operation_log_validation | default(true)

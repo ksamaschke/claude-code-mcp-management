@@ -1,0 +1,54 @@
+---
+# =============================================================================
+# MCP Validation Role - Resources Validation  
+# =============================================================================
+# Validate system resources with externalized thresholds
+# =============================================================================
+
+- name: "{{ mcp_validate_memory_name | default('Check available memory') }}"
+  command: "{{ mcp_memory_check_command | default('free -m') }}"
+  register: memory_check
+  changed_when: false
+  when: mcp_validate_memory_enabled | default(true)
+
+- name: "{{ mcp_validate_memory_parse_name | default('Parse memory information') }}"
+  set_fact:
+    mcp_available_memory_mb: >-
+      {{ memory_check.stdout_lines[1].split()[6] | int if memory_check.stdout_lines | length > 1 else 0 }}
+  when:
+    - "{{ mcp_validate_memory_enabled | default(true) }}"
+    - "memory_check is defined"
+
+- name: "{{ mcp_validate_memory_assert_name | default('Assert sufficient memory') }}"
+  assert:
+    that:
+      - "{{ mcp_available_memory_mb | int >= mcp_validate_resources_min_memory_mb }}"
+    fail_msg: "{{ mcp_validate_memory_fail_msg | default('Insufficient memory available') }}: {{ mcp_available_memory_mb }}MB < {{ mcp_validate_resources_min_memory_mb }}MB"
+    success_msg: "{{ mcp_validate_memory_success_msg | default('Sufficient memory available') }}: {{ mcp_available_memory_mb }}MB"
+  when:
+    - "{{ mcp_validate_memory_enabled | default(true) }}"
+    - "mcp_available_memory_mb is defined"
+
+- name: "{{ mcp_validate_disk_name | default('Check available disk space') }}"
+  command: "{{ mcp_disk_check_command | default('df -m ' + (mcp_disk_check_path | default('/'))) }}"
+  register: disk_check
+  changed_when: false
+  when: mcp_validate_disk_enabled | default(true)
+
+- name: "{{ mcp_validate_disk_parse_name | default('Parse disk information') }}"
+  set_fact:
+    mcp_available_disk_mb: >-
+      {{ disk_check.stdout_lines[1].split()[3] | int if disk_check.stdout_lines | length > 1 else 0 }}
+  when:
+    - "{{ mcp_validate_disk_enabled | default(true) }}"
+    - "disk_check is defined"
+
+- name: "{{ mcp_validate_disk_assert_name | default('Assert sufficient disk space') }}"
+  assert:
+    that:
+      - "{{ mcp_available_disk_mb | int >= mcp_validate_resources_min_disk_mb }}"
+    fail_msg: "{{ mcp_validate_disk_fail_msg | default('Insufficient disk space available') }}: {{ mcp_available_disk_mb }}MB < {{ mcp_validate_resources_min_disk_mb }}MB"
+    success_msg: "{{ mcp_validate_disk_success_msg | default('Sufficient disk space available') }}: {{ mcp_available_disk_mb }}MB"
+  when:
+    - "{{ mcp_validate_disk_enabled | default(true) }}"
+    - "mcp_available_disk_mb is defined"

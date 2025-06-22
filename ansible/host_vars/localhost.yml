@@ -1,0 +1,23 @@
+---
+# =============================================================================
+# Host-specific variables for localhost
+# =============================================================================
+# Highest priority variables (overrides group_vars and defaults)
+
+# Override for localhost testing
+mcp_target_host: "localhost"
+claude_cli_command: "claude"
+
+# Localhost-specific server enable/disable
+mcp_servers_enabled:
+  brave_search: false  # Override group_vars default
+  github: true
+  gitlab: false
+  memory: true
+
+# Localhost-specific environment
+mcp_environment_mappings:
+  api_keys:
+    github: "localhost_test_token"
+    gitlab: ""
+    brave_search: ""

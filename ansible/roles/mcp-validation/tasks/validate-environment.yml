@@ -1,0 +1,79 @@
+---
+# =============================================================================
+# MCP Validation Role - Environment Validation
+# =============================================================================
+# Validate environment variables and settings with externalized checks
+# =============================================================================
+
+- name: "{{ mcp_validate_env_vars_name | default('Validate required environment variables') }}"
+  assert:
+    that:
+      - "{{ lookup('env', item) != '' }}"
+    fail_msg: "{{ mcp_validate_env_vars_fail_msg | default('Missing required environment variable') }}: {{ item }}"
+    success_msg: "{{ mcp_validate_env_vars_success_msg | default('Environment variable present') }}: {{ item }}"
+  loop: "{{ mcp_required_environment_variables | default([]) }}"
+  when:
+    - mcp_validate_environment_strict
+    - "mcp_required_environment_variables is defined"
+    - "mcp_required_environment_variables | length > 0"
+
+- name: "{{ mcp_validate_env_optional_name | default('Check optional environment variables') }}"
+  debug:
+    msg: |
+      {{ mcp_validate_env_optional_message | default('Optional environment variable') }} {{ item }}: 
+      {{ 'SET' if lookup('env', item) != '' else 'NOT SET' }}
+  loop: "{{ mcp_optional_environment_variables | default([]) }}"
+  when:
+    - "mcp_optional_environment_variables is defined"
+    - "mcp_optional_environment_variables | length > 0"
+    - mcp_validation_log_level | default('info') in ['debug', 'info']
+
+- name: "{{ mcp_validate_claude_config_name | default('Validate Claude configuration directory') }}"
+  stat:
+    path: "{{ mcp_claude_config_dir | default(ansible_env.HOME + '/.claude') }}"
+  register: claude_config_stat
+
+- name: "{{ mcp_validate_claude_config_assert_name | default('Assert Claude config directory exists') }}"
+  assert:
+    that:
+      - claude_config_stat.stat.exists
+      - claude_config_stat.stat.isdir
+    fail_msg: "{{ mcp_validate_claude_config_fail_msg | default('Claude configuration directory not found') }}"
+    success_msg: "{{ mcp_validate_claude_config_success_msg | default('Claude configuration directory exists') }}"
+  when: mcp_validate_claude_config_required | default(true)
+
+- name: "{{ mcp_validate_claude_settings_name | default('Check Claude settings file') }}"
+  stat:
+    path: "{{ mcp_claude_settings_file | default(ansible_env.HOME + '/.claude/claude_desktop_config.json') }}"
+  register: claude_settings_stat
+
+- name: "{{ mcp_validate_user_permissions_name | default('Validate user permissions') }}"
+  command: "{{ mcp_user_permissions_command | default('id') }}"
+  register: user_permissions_check
+  changed_when: false
+  when: mcp_validate_user_permissions_enabled | default(true)
+
+- name: "{{ mcp_validate_write_permissions_name | default('Validate write permissions to Claude config') }}"
+  file:
+    path: "{{ mcp_claude_config_dir | default(ansible_env.HOME + '/.claude') }}/test_write"
+    state: touch
+    mode: "{{ mcp_test_file_mode | default('0644') }}"
+  register: write_permissions_check
+  ignore_errors: true
+  when: mcp_validate_write_permissions_enabled | default(true)
+
+- name: "{{ mcp_validate_write_permissions_cleanup_name | default('Clean up write test file') }}"
+  file:
+    path: "{{ mcp_claude_config_dir | default(ansible_env.HOME + '/.claude') }}/test_write"
+    state: absent
+  when:
+    - mcp_validate_write_permissions_enabled | default(true)
+    - not write_permissions_check.failed
+
+- name: "{{ mcp_validate_write_permissions_assert_name | default('Assert write permissions') }}"
+  assert:
+    that:
+      - "not write_permissions_check.failed"
+    fail_msg: "{{ mcp_validate_write_permissions_fail_msg | default('Cannot write to Claude configuration directory') }}"
+    success_msg: "{{ mcp_validate_write_permissions_success_msg | default('Write permissions to Claude config verified') }}"
+  when: mcp_validate_write_permissions_enabled | default(true)

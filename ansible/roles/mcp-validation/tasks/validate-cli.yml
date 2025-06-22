@@ -1,0 +1,121 @@
+---
+# =============================================================================
+# MCP Validation Role - CLI Tools Validation
+# =============================================================================
+# Validate CLI tool availability with externalized commands
+# =============================================================================
+
+- name: "{{ mcp_validate_claude_cli_name | default('Validate pre-discovered Claude CLI') }}"
+  command: "{{ claude_cli_command | default('claude') }} --version"
+  register: claude_cli_validation_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_claude_cli_enabled
+
+- name: "{{ mcp_validate_claude_cli_assert_name | default('Assert Claude CLI available') }}"
+  assert:
+    that:
+      - claude_cli_validation_check.rc == 0
+    fail_msg: "{{ mcp_validate_claude_cli_fail_msg | default('Claude CLI validation failed') }} - Command: {{ claude_cli_command | default('claude') }}"
+    success_msg: "{{ mcp_validate_claude_cli_success_msg | default('Claude CLI is available') }} ({{ claude_cli_command | default('claude') }})"
+  when: mcp_validate_claude_cli_enabled
+
+- name: "{{ mcp_validate_nodejs_name }}"
+  command: "{{ mcp_validate_nodejs_command }}"
+  register: nodejs_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_nodejs_enabled
+
+- name: "{{ mcp_validate_nodejs_version_name | default('Check Node.js version') }}"
+  command: "{{ mcp_nodejs_version_command | default('node --version') }}"
+  register: nodejs_version_check
+  failed_when: false
+  changed_when: false
+  when:
+    - mcp_validate_nodejs_enabled
+    - nodejs_check.rc == 0
+
+- name: "{{ mcp_validate_nodejs_assert_name | default('Assert Node.js available and version') }}"
+  assert:
+    that:
+      - nodejs_check.rc == 0
+      - nodejs_version_check.rc == 0 or nodejs_version_check.rc is not defined
+    fail_msg: "{{ mcp_validate_nodejs_fail_msg }}"
+    success_msg: "{{ mcp_validate_nodejs_success_msg | default('Node.js is available') }}"
+  when: mcp_validate_nodejs_enabled
+
+- name: "{{ mcp_validate_npm_name }}"
+  command: "{{ mcp_validate_npm_command }}"
+  register: npm_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_npm_enabled
+
+- name: "{{ mcp_validate_npm_assert_name | default('Assert NPM available') }}"
+  assert:
+    that:
+      - npm_check.rc == 0
+    fail_msg: "{{ mcp_validate_npm_fail_msg }}"
+    success_msg: "{{ mcp_validate_npm_success_msg | default('NPM is available') }}"
+  when: mcp_validate_npm_enabled
+
+- name: "{{ mcp_validate_npx_name }}"
+  command: "{{ mcp_validate_npx_command }}"
+  register: npx_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_npx_enabled
+
+- name: "{{ mcp_validate_npx_assert_name | default('Assert NPX available') }}"
+  assert:
+    that:
+      - npx_check.rc == 0
+    fail_msg: "{{ mcp_validate_npx_fail_msg }}"
+    success_msg: "{{ mcp_validate_npx_success_msg | default('NPX is available') }}"
+  when: mcp_validate_npx_enabled
+
+- name: "{{ mcp_validate_uv_name }}"
+  command: "{{ mcp_validate_uv_command }}"
+  register: uv_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_uv_enabled
+
+- name: "{{ mcp_validate_uv_assert_name | default('Assert UV available') }}"
+  assert:
+    that:
+      - uv_check.rc == 0
+    fail_msg: "{{ mcp_validate_uv_fail_msg }}"
+    success_msg: "{{ mcp_validate_uv_success_msg | default('UV is available') }}"
+  when: mcp_validate_uv_enabled
+
+- name: "{{ mcp_validate_docker_name }}"
+  command: "{{ mcp_validate_docker_command }}"
+  register: docker_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_docker_enabled
+
+- name: "{{ mcp_validate_docker_assert_name | default('Assert Docker available') }}"
+  assert:
+    that:
+      - docker_check.rc == 0
+    fail_msg: "{{ mcp_validate_docker_fail_msg }}"
+    success_msg: "{{ mcp_validate_docker_success_msg | default('Docker is available') }}"
+  when: mcp_validate_docker_enabled
+
+- name: "{{ mcp_validate_python_name }}"
+  command: "{{ mcp_validate_python_command }}"
+  register: python_check
+  failed_when: false
+  changed_when: false
+  when: mcp_validate_python_enabled
+
+- name: "{{ mcp_validate_python_assert_name | default('Assert Python available') }}"
+  assert:
+    that:
+      - python_check.rc == 0
+    fail_msg: "{{ mcp_validate_python_fail_msg }}"
+    success_msg: "{{ mcp_validate_python_success_msg | default('Python is available') }}"
+  when: mcp_validate_python_enabled

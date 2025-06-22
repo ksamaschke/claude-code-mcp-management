@@ -1,0 +1,86 @@
+---
+# =============================================================================
+# MCP Operations Role - Default Variables
+# =============================================================================
+# Command execution and MCP server management with externalized operations
+# =============================================================================
+
+# Operation modes
+mcp_operation_mode: "{{ operation_mode | default(mcp_mode | default('list')) }}"  # add, remove, list, status
+mcp_operation_scope: "{{ mcp_scope | default(operation_scope | default('user')) }}"     # user, project
+mcp_operation_dry_run: "{{ mcp_dry_run | default(operation_dry_run | default(false)) }}"
+
+# Command execution
+mcp_command_timeout: "{{ command_timeout | default(60) }}"
+mcp_command_retries: "{{ command_retries | default(3) }}"
+mcp_command_delay: "{{ command_delay | default(2) }}"
+
+# Claude CLI commands - fully externalized with proper command structure
+mcp_claude_commands:
+  list: "{{ mcp_claude_list_command | default('mcp list') }}"
+  add: "{{ mcp_claude_add_command | default('mcp add-json') }}"
+  remove: "{{ mcp_claude_remove_command | default('mcp remove') }}"
+  status: "{{ mcp_claude_status_command | default('mcp status') }}"
+  config: "{{ mcp_claude_config_command | default('mcp config') }}"
+
+# Command argument patterns for different operations
+mcp_claude_command_patterns:
+  list: "{{ mcp_claude_list_pattern | default('{base_command} {flags}') }}"
+  add: "{{ mcp_claude_add_pattern | default('{base_command} {server_name} {scope_flag} {flags}') }}"
+  remove: "{{ mcp_claude_remove_pattern | default('{base_command} {server_name} {scope_flag} {flags}') }}"
+  status: "{{ mcp_claude_status_pattern | default('{base_command} {scope_flag} {flags}') }}"
+  config: "{{ mcp_claude_config_pattern | default('{base_command} {scope_flag} {flags}') }}"
+
+# Operation flags
+mcp_claude_command_flags:
+  scope_user: "{{ mcp_claude_scope_user_flag | default('-s user') }}"
+  scope_project: "{{ mcp_claude_scope_project_flag | default('-s project') }}"
+  force: "{{ mcp_claude_force_flag | default('--force') }}"
+  dry_run: "{{ mcp_claude_dry_run_flag | default('--dry-run') }}"
+  verbose: "{{ mcp_claude_verbose_flag | default('--verbose') }}"
+
+# Operations that require server names
+mcp_operations_requiring_servers:
+  - add
+  - remove
+
+# Operations that work without specific servers
+mcp_operations_no_servers_required:
+  - list
+  - status
+  - config
+  - sync
+
+# Server management
+mcp_server_operation_enabled: true
+mcp_server_operation_name: "Execute MCP server operations"
+mcp_server_backup_before_change: true
+mcp_server_validate_after_change: true
+
+# Cleanup operations
+mcp_cleanup_operation_enabled: true
+mcp_cleanup_orphaned_servers: true
+mcp_cleanup_disabled_servers: true
+mcp_cleanup_backup_files: false
+
+# Error handling
+mcp_operation_continue_on_error: true
+mcp_operation_collect_errors: true
+mcp_operation_log_errors: true
+mcp_operation_fail_threshold: "{{ operation_fail_threshold | default(50) }}"  # percentage
+
+# Logging and output
+mcp_operation_log_commands: true
+mcp_operation_log_output: true
+mcp_operation_log_level: "{{ operation_log_level | default('info') }}"
+mcp_operation_show_progress: true
+
+# Parallel execution
+mcp_operation_parallel_enabled: false
+mcp_operation_parallel_batch_size: "{{ operation_batch_size | default(5) }}"
+mcp_operation_parallel_max_workers: "{{ operation_max_workers | default(3) }}"
+
+# Validation
+mcp_operation_validate_before: true
+mcp_operation_validate_after: true
+mcp_operation_validate_strict: false

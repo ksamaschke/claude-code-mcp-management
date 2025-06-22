@@ -1,0 +1,31 @@
+---
+- name: Get list of existing user-scoped MCP servers
+  command: claude mcp list
+  register: existing_user_servers
+  changed_when: false
+  failed_when: false
+
+- name: Parse existing server names
+  set_fact:
+    existing_server_names: >-
+      {%- set names = [] -%}
+      {%- if existing_user_servers.rc is defined and existing_user_servers.rc == 0 -%}
+        {%- for line in existing_user_servers.stdout_lines | default([]) -%}
+          {%- if line and ':' in line -%}
+            {%- set server_name = line.split(':')[0].strip() -%}
+            {%- if server_name -%}
+              {%- set _ = names.append(server_name) -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ names | list }}
+
+- name: Configure selected MCP servers
+  include_tasks: add-mcp-server.yml
+  vars:
+    server_name: "{{ item }}"
+    server_config: "{{ mcp_servers[item] }}"
+    server_scope: "user"
+  loop: "{{ servers_to_configure }}"
+  when: item in mcp_servers

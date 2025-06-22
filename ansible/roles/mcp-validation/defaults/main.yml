@@ -1,0 +1,84 @@
+---
+# =============================================================================
+# MCP Validation Role - Default Variables
+# =============================================================================
+# Environment and system validation with externalized checks
+# =============================================================================
+
+# Claude CLI validation
+mcp_validate_claude_cli_enabled: true
+mcp_validate_claude_cli_name: "Validate Claude CLI installation"
+mcp_validate_claude_cli_command: "which claude"
+mcp_validate_claude_cli_fail_msg: "Claude CLI not found. Please install Claude CLI first."
+
+# Node.js validation
+mcp_validate_nodejs_enabled: true
+mcp_validate_nodejs_name: "Validate Node.js installation"
+mcp_validate_nodejs_command: "which node"
+mcp_validate_nodejs_fail_msg: "Node.js not found. Required for NPM-based MCP servers."
+mcp_validate_nodejs_min_version: "16.0.0"
+
+# NPM validation
+mcp_validate_npm_enabled: true
+mcp_validate_npm_name: "Validate NPM installation"
+mcp_validate_npm_command: "which npm"
+mcp_validate_npm_fail_msg: "NPM not found. Required for NPM-based MCP servers."
+
+# NPX validation
+mcp_validate_npx_enabled: true
+mcp_validate_npx_name: "Validate NPX installation"
+mcp_validate_npx_command: "which npx"
+mcp_validate_npx_fail_msg: "NPX not found. Required for NPM-based MCP servers."
+
+# UV validation (for Python MCP servers)
+mcp_validate_uv_enabled: false
+mcp_validate_uv_name: "Validate UV installation"
+mcp_validate_uv_command: "which uv"
+mcp_validate_uv_fail_msg: "UV not found. Required for UV-based Python MCP servers."
+
+# Docker validation (for Docker MCP servers)
+mcp_validate_docker_enabled: false
+mcp_validate_docker_name: "Validate Docker installation"
+mcp_validate_docker_command: "which docker"
+mcp_validate_docker_fail_msg: "Docker not found. Required for Docker-based MCP servers."
+
+# Python validation
+mcp_validate_python_enabled: false
+mcp_validate_python_name: "Validate Python installation"
+mcp_validate_python_command: "which python3"
+mcp_validate_python_fail_msg: "Python 3 not found. Required for Python-based MCP servers."
+mcp_validate_python_min_version: "3.8.0"
+
+# Environment validation
+mcp_validate_environment_enabled: true
+mcp_validate_environment_name: "Validate environment variables"
+mcp_validate_environment_strict: false
+
+# Permissions validation
+mcp_validate_permissions_enabled: true
+mcp_validate_permissions_name: "Validate file permissions"
+mcp_validate_permissions_config_readable: true
+
+# Network validation
+mcp_validate_network_enabled: false
+mcp_validate_network_name: "Validate network connectivity"
+mcp_validate_network_test_urls:
+  - "https://registry.npmjs.org/"
+  - "https://pypi.org/"
+
+# Path validation
+mcp_validate_paths_enabled: true
+mcp_validate_paths_name: "Validate required paths"
+mcp_validate_paths_create_missing: false
+
+# System resources validation
+mcp_validate_resources_enabled: false
+mcp_validate_resources_name: "Validate system resources"
+mcp_validate_resources_min_memory_mb: 512
+mcp_validate_resources_min_disk_mb: 100
+
+# Validation failure behavior
+mcp_validation_fail_fast: false
+mcp_validation_collect_all_errors: true
+mcp_validation_continue_on_warning: true
+mcp_validation_log_level: "info"

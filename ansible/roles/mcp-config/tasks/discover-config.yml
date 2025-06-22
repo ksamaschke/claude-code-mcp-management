@@ -1,0 +1,42 @@
+---
+# =============================================================================
+# MCP Config Role - Configuration Discovery
+# =============================================================================
+# Discover configuration files with externalized patterns
+# =============================================================================
+
+- name: "{{ mcp_config_discovery_search_name | default('Search for configuration files') }}"
+  stat:
+    path: "{{ item }}"
+  register: config_file_discovery
+  loop: "{{ (mcp_config_file_patterns | default([])) + ([mcp_config_file] if mcp_config_file not in (mcp_config_file_patterns | default([])) else []) }}"
+  delegate_to: "{{ mcp_config_discovery_delegate | default('localhost') }}"
+
+- name: "{{ mcp_config_discovery_env_search_name | default('Search for environment files') }}"
+  stat:
+    path: "{{ item }}"
+  register: env_file_discovery
+  loop: "{{ (mcp_env_file_patterns | default([])) + ([mcp_env_file] if mcp_env_file not in (mcp_env_file_patterns | default([])) else []) }}"
+  delegate_to: "{{ mcp_env_discovery_delegate | default('localhost') }}"
+
+- name: "{{ mcp_config_discovery_set_found_name | default('Set found configuration files') }}"
+  set_fact:
+    mcp_found_config_files: >-
+      {{ config_file_discovery.results | selectattr('stat.exists') | map(attribute='item') | list }}
+    mcp_found_env_files: >-
+      {{ env_file_discovery.results | selectattr('stat.exists') | map(attribute='item') | list }}
+
+- name: "{{ mcp_config_discovery_log_found_name | default('Log discovered files') }}"
+  debug:
+    msg: |
+      {{ mcp_config_discovery_found_message | default('Configuration discovery results') }}:
+      {{ mcp_config_files_label | default('Config files') }}: {{ mcp_found_config_files | default([]) }}
+      {{ mcp_env_files_label | default('Environment files') }}: {{ mcp_found_env_files | default([]) }}
+  when: mcp_config_logging_enabled | default(true)
+
+- name: "{{ mcp_config_discovery_fail_name | default('Fail if no configuration found') }}"
+  fail:
+    msg: "{{ mcp_config_discovery_fail_message | default('No configuration files found') }}"
+  when:
+    - mcp_config_discovery_require_config | default(false)
+    - "mcp_found_config_files | length == 0"

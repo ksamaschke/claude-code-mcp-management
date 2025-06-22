@@ -1,0 +1,39 @@
+---
+# =============================================================================
+# MCP Validation Role - Network Validation
+# =============================================================================
+# Validate network connectivity with externalized test URLs
+# =============================================================================
+
+- name: "{{ mcp_validate_network_connectivity_name | default('Test network connectivity') }}"
+  uri:
+    url: "{{ item }}"
+    method: "{{ mcp_network_test_method | default('HEAD') }}"
+    timeout: "{{ mcp_network_test_timeout | default(10) }}"
+    validate_certs: "{{ mcp_network_validate_certs | default(true) }}"
+  register: network_connectivity_test
+  loop: "{{ mcp_validate_network_test_urls }}"
+  ignore_errors: "{{ mcp_network_ignore_errors | default(true) }}"
+  when: "mcp_validate_network_test_urls is defined and mcp_validate_network_test_urls | length > 0"
+
+- name: "{{ mcp_validate_network_connectivity_log_name | default('Log network connectivity results') }}"
+  debug:
+    msg: |
+      {{ mcp_validate_network_connectivity_message | default('Network connectivity test') }} {{ item.item }}: 
+      {{ 'SUCCESS' if item.status is defined and item.status == 200 else 'FAILED' }}
+  loop: "{{ network_connectivity_test.results | default([]) }}"
+  when:
+    - "network_connectivity_test is defined"
+    - "{{ mcp_validation_log_level | default('info') in ['debug', 'info'] }}"
+
+- name: "{{ mcp_validate_network_connectivity_assert_name | default('Assert critical network connectivity') }}"
+  assert:
+    that:
+      - "{{ item.status is defined and item.status == 200 }}"
+    fail_msg: "{{ mcp_validate_network_connectivity_fail_msg | default('Cannot reach critical network resource') }}: {{ item.item }}"
+    success_msg: "{{ mcp_validate_network_connectivity_success_msg | default('Network resource accessible') }}: {{ item.item }}"
+  loop: "{{ network_connectivity_test.results | default([]) }}"
+  when:
+    - "network_connectivity_test is defined"
+    - "{{ mcp_network_require_critical | default(false) }}"
+    - "item.item in {{ mcp_critical_network_urls | default([]) }}"

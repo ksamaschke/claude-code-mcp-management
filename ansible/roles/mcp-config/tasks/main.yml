@@ -1,0 +1,22 @@
+---
+# =============================================================================
+# MCP Config Role - Main Tasks
+# =============================================================================
+# Configuration loading and parsing with fully externalized variables
+# =============================================================================
+
+- name: "{{ mcp_config_task_discovery_name | default('Discover configuration files') }}"
+  include_tasks: "{{ mcp_config_discovery_task_file | default('discover-config.yml') }}"
+  when: mcp_config_file_discovery_enabled | default(true)
+
+- name: "{{ mcp_config_task_load_name | default('Load configuration files') }}"
+  include_tasks: "{{ mcp_config_load_task_file | default('load-config.yml') }}"
+  when: mcp_config_loader_enabled | default(true)
+
+- name: "{{ mcp_config_task_validate_name | default('Validate configuration') }}"
+  include_tasks: "{{ mcp_config_validation_task_file | default('validate-config.yml') }}"
+  when: mcp_config_validation_enabled | default(true)
+
+- name: "{{ mcp_config_task_parse_name | default('Parse configuration') }}"
+  include_tasks: "{{ mcp_config_parse_task_file | default('parse-config.yml') }}"
+  when: mcp_config_parser_enabled | default(true)
