@@ -92,7 +92,7 @@
   debug:
     msg: |
       Remove operation {{ item.item }}: 
-      {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}
+      {{ 'SUCCESS' if (item.rc is defined and item.rc == 0) else 'FAILED' if item.rc is defined else 'COMPLETED' }}
       {% if item.stdout is defined and item.stdout != '' %}
       Output: {{ item.stdout }}
       {% endif %}
@@ -106,7 +106,7 @@
   debug:
     msg: |
       Add operation {{ item.item }}: 
-      {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}
+      {{ 'SUCCESS' if (item.rc is defined and item.rc == 0) else 'FAILED' if item.rc is defined else 'COMPLETED' }}
       {% if item.stdout is defined and item.stdout != '' %}
       Output: {{ item.stdout }}
       {% endif %}
@@ -121,12 +121,12 @@
     mcp_sync_operation_errors: >-
       {% set errors = [] -%}
       {% for result in sync_remove_results.results | default([]) -%}
-        {% if result.rc != 0 -%}
+        {% if result.rc is defined and result.rc != 0 -%}
           {% set _ = errors.append({'operation': 'remove', 'server': result.item, 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
         {% endif -%}
       {% endfor -%}
       {% for result in sync_add_results.results | default([]) -%}
-        {% if result.rc != 0 and 'already exists' not in result.stderr -%}
+        {% if result.rc is defined and result.rc != 0 and 'already exists' not in (result.stderr | default('')) -%}
           {% set _ = errors.append({'operation': 'add', 'server': result.item, 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
         {% endif -%}
       {% endfor -%}

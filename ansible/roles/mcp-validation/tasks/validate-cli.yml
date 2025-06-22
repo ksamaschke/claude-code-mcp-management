@@ -15,7 +15,7 @@
 - name: "{{ mcp_validate_claude_cli_assert_name | default('Assert Claude CLI available') }}"
   assert:
     that:
-      - claude_cli_validation_check.rc == 0
+      - claude_cli_validation_check.rc is defined and claude_cli_validation_check.rc == 0
     fail_msg: "{{ mcp_validate_claude_cli_fail_msg | default('Claude CLI validation failed') }} - Command: {{ claude_cli_command | default('claude') }}"
     success_msg: "{{ mcp_validate_claude_cli_success_msg | default('Claude CLI is available') }} ({{ claude_cli_command | default('claude') }})"
   when: mcp_validate_claude_cli_enabled
@@ -34,12 +34,12 @@
   changed_when: false
   when:
     - mcp_validate_nodejs_enabled
-    - nodejs_check.rc == 0
+    - nodejs_check.rc is defined and nodejs_check.rc == 0
 
 - name: "{{ mcp_validate_nodejs_assert_name | default('Assert Node.js available and version') }}"
   assert:
     that:
-      - nodejs_check.rc == 0
+      - nodejs_check.rc is defined and nodejs_check.rc == 0
       - nodejs_version_check.rc == 0 or nodejs_version_check.rc is not defined
     fail_msg: "{{ mcp_validate_nodejs_fail_msg }}"
     success_msg: "{{ mcp_validate_nodejs_success_msg | default('Node.js is available') }}"
@@ -55,7 +55,7 @@
 - name: "{{ mcp_validate_npm_assert_name | default('Assert NPM available') }}"
   assert:
     that:
-      - npm_check.rc == 0
+      - npm_check.rc is defined and npm_check.rc == 0
     fail_msg: "{{ mcp_validate_npm_fail_msg }}"
     success_msg: "{{ mcp_validate_npm_success_msg | default('NPM is available') }}"
   when: mcp_validate_npm_enabled
@@ -70,7 +70,7 @@
 - name: "{{ mcp_validate_npx_assert_name | default('Assert NPX available') }}"
   assert:
     that:
-      - npx_check.rc == 0
+      - npx_check.rc is defined and npx_check.rc == 0
     fail_msg: "{{ mcp_validate_npx_fail_msg }}"
     success_msg: "{{ mcp_validate_npx_success_msg | default('NPX is available') }}"
   when: mcp_validate_npx_enabled
@@ -85,7 +85,7 @@
 - name: "{{ mcp_validate_uv_assert_name | default('Assert UV available') }}"
   assert:
     that:
-      - uv_check.rc == 0
+      - uv_check.rc is defined and uv_check.rc == 0
     fail_msg: "{{ mcp_validate_uv_fail_msg }}"
     success_msg: "{{ mcp_validate_uv_success_msg | default('UV is available') }}"
   when: mcp_validate_uv_enabled
@@ -100,7 +100,7 @@
 - name: "{{ mcp_validate_docker_assert_name | default('Assert Docker available') }}"
   assert:
     that:
-      - docker_check.rc == 0
+      - docker_check.rc is defined and docker_check.rc == 0
     fail_msg: "{{ mcp_validate_docker_fail_msg }}"
     success_msg: "{{ mcp_validate_docker_success_msg | default('Docker is available') }}"
   when: mcp_validate_docker_enabled
@@ -115,7 +115,7 @@
 - name: "{{ mcp_validate_python_assert_name | default('Assert Python available') }}"
   assert:
     that:
-      - python_check.rc == 0
+      - python_check.rc is defined and python_check.rc == 0
     fail_msg: "{{ mcp_validate_python_fail_msg }}"
     success_msg: "{{ mcp_validate_python_success_msg | default('Python is available') }}"
   when: mcp_validate_python_enabled
