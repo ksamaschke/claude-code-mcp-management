@@ -90,8 +90,8 @@
 - name: "{{ mcp_operation_execute_log_name | default('Log operation results') }}"
   debug:
     msg: |
-      {{ mcp_operation_execute_log_message | default('Operation executed') }} {{ item.item }}: 
-      {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}
+      {{ mcp_operation_execute_log_message | default('Operation executed') }} {{ item.item if item.item is defined else 'operation' }}: 
+      {{ 'SUCCESS' if (item.rc is defined and item.rc == 0) else 'FAILED' if item.rc is defined else 'COMPLETED' }}
       {% if mcp_operation_log_output and item.stdout is defined and item.stdout != '' %}
       {{ mcp_operation_execute_output_label | default('Output') }}: {{ item.stdout }}
       {% endif %}
