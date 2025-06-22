@@ -1,8 +1,7 @@
-# MCP Server Manager - Simplified Makefile
-# Clean interface to Ansible-based MCP server management
-# All operations call unified ansible/manage-mcp.yml playbook
+# MCP Server Manager - Simplified Interface
+# Ansible-based MCP server management with clean user interface
 
-# Configuration defaults (can be overridden)
+# Configuration defaults
 CONFIG_FILE ?= mcp-servers.json
 ENV_FILE ?= .env
 SCOPE ?= user
@@ -10,310 +9,268 @@ PROJECT ?= .
 SSH_HOST ?= localhost
 SSH_USER ?= $(USER)
 
-# Color codes for output
+# Colors for output
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
-RED := \033[0;31m
 NC := \033[0m
 
-# Default target
 .DEFAULT_GOAL := help
 
-# Help target - shows available commands
+# Core user interface - essential commands only
 .PHONY: help
 help:
 	@echo "$(GREEN)MCP Server Manager$(NC)"
-	@echo "$(YELLOW)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 	@echo ""
-	@echo "$(GREEN)Usage:$(NC)"
-	@echo "  make <target> [OPTION=value ...]"
+	@echo "$(GREEN)Core Commands:$(NC)"
+	@echo "  $(YELLOW)list$(NC)        - List installed servers"
+	@echo "  $(YELLOW)sync$(NC)        - Sync all servers from config"
+	@echo "  $(YELLOW)add$(NC)         - Add servers (SERVERS=name1,name2)"
+	@echo "  $(YELLOW)remove$(NC)      - Remove servers (SERVERS=name1,name2)"
+	@echo "  $(YELLOW)clean$(NC)       - Remove orphaned servers"
+	@echo "  $(YELLOW)dry-run$(NC)     - Preview changes without applying"
 	@echo ""
-	@echo "$(GREEN)Local Operations:$(NC)"
-	@echo "  $(YELLOW)list$(NC)          - List all configured MCP servers"
-	@echo "  $(YELLOW)sync$(NC)          - Sync all servers from configuration"
-	@echo "  $(YELLOW)dry-run$(NC)       - Check configuration without making changes"
-	@echo "  $(YELLOW)add$(NC)           - Add specific servers (requires SERVERS=...)"
-	@echo "  $(YELLOW)add-all$(NC)       - Add ALL servers from configuration file"
-	@echo "  $(YELLOW)remove$(NC)        - Remove specific servers (requires SERVERS=...)"
-	@echo "  $(YELLOW)clean$(NC)         - Remove orphaned servers"
+	@echo "$(GREEN)Project Commands:$(NC)"
+	@echo "  $(YELLOW)project-sync$(NC) - Sync project servers"
+	@echo "  $(YELLOW)project-add$(NC)  - Add to project (SERVERS=...)"
 	@echo ""
-	@echo "$(GREEN)Remote Operations:$(NC)"
-	@echo "  $(YELLOW)sync-remote$(NC)   - Sync servers on remote host"
-	@echo "  $(YELLOW)add-remote$(NC)    - Add servers on remote host (requires SERVERS=...)"
-	@echo "  $(YELLOW)remove-remote$(NC) - Remove servers on remote host (requires SERVERS=...)"
-	@echo "  $(YELLOW)list-remote$(NC)   - List servers on remote host"
+	@echo "$(GREEN)Remote Commands:$(NC)"
+	@echo "  $(YELLOW)sync-remote$(NC)  - Sync on remote (SSH_HOST=ip SSH_USER=user)"
+	@echo "  $(YELLOW)add-remote$(NC)   - Add on remote (SERVERS=... SSH_HOST=ip)"
 	@echo ""
-	@echo "$(GREEN)Project Operations:$(NC)"
-	@echo "  $(YELLOW)project-sync$(NC)  - Sync servers for current project"
-	@echo "  $(YELLOW)project-add$(NC)   - Add servers to current project (requires SERVERS=...)"
-	@echo "  $(YELLOW)project-remove$(NC) - Remove servers from current project (requires SERVERS=...)"
-	@echo "  $(YELLOW)project-list$(NC)  - List servers in current project"
-	@echo ""
-	@echo "$(GREEN)Options:$(NC)"
-	@echo "  SERVERS       - Comma-separated list of servers (for add/remove)"
-	@echo "  CONFIG_FILE   - Path to mcp-servers.json (default: $(CONFIG_FILE))"
-	@echo "  ENV_FILE      - Path to .env file (default: $(ENV_FILE))"
-	@echo "  SCOPE         - Installation scope: user|project (default: $(SCOPE))"
-	@echo "  PROJECT       - Project path for project scope (default: $(PROJECT))"
-	@echo "  SSH_HOST      - Target hostname/IP for remote operations (default: $(SSH_HOST))"
-	@echo "  SSH_USER      - SSH username for remote operations (default: $(SSH_USER))"
+	@echo "$(GREEN)Utility:$(NC)"
+	@echo "  $(YELLOW)show-config$(NC)  - Display current configuration"
+	@echo "  $(YELLOW)help-advanced$(NC) - Show all commands and options"
 	@echo ""
 	@echo "$(GREEN)Examples:$(NC)"
-	@echo "  make sync                                    # Sync all servers locally"
-	@echo "  make add SERVERS=memory,brave-search         # Add specific servers locally"
-	@echo "  make add-all                                 # Add ALL servers from config locally"
-	@echo "  make remove SERVERS=github                   # Remove a server locally"
+	@echo "  make add SERVERS=memory,github"
+	@echo "  make sync-remote SSH_HOST=server.com SSH_USER=admin"
+
+# Advanced help - complete command reference
+.PHONY: help-advanced
+help-advanced:
+	@echo "$(GREEN)MCP Server Manager - Advanced Usage$(NC)"
 	@echo ""
-	@echo "  $(GREEN)Remote examples:$(NC)"
+	@echo "$(GREEN)All Commands:$(NC)"
+	@echo "  $(YELLOW)list$(NC)             - List installed servers"
+	@echo "  $(YELLOW)sync$(NC)             - Sync all servers from configuration"
+	@echo "  $(YELLOW)dry-run$(NC)          - Preview changes without applying"
+	@echo "  $(YELLOW)add$(NC)              - Add specific servers (SERVERS=...)"
+	@echo "  $(YELLOW)add-all$(NC)          - Add ALL servers from config"
+	@echo "  $(YELLOW)remove$(NC)           - Remove specific servers (SERVERS=...)"
+	@echo "  $(YELLOW)clean$(NC)            - Remove orphaned servers"
+	@echo "  $(YELLOW)project-sync$(NC)     - Sync servers for current project"
+	@echo "  $(YELLOW)project-add$(NC)      - Add servers to project (SERVERS=...)"
+	@echo "  $(YELLOW)project-remove$(NC)   - Remove servers from project (SERVERS=...)"
+	@echo "  $(YELLOW)project-list$(NC)     - List project servers"
+	@echo "  $(YELLOW)sync-remote$(NC)      - Sync servers on remote host"
+	@echo "  $(YELLOW)add-remote$(NC)       - Add servers on remote (SERVERS=...)"
+	@echo "  $(YELLOW)remove-remote$(NC)    - Remove servers on remote (SERVERS=...)"
+	@echo "  $(YELLOW)list-remote$(NC)      - List servers on remote host"
+	@echo "  $(YELLOW)check-syntax$(NC)     - Validate Ansible playbook"
+	@echo "  $(YELLOW)test-connection$(NC)  - Test SSH connectivity"
+	@echo "  $(YELLOW)show-config$(NC)      - Display current configuration"
+	@echo ""
+	@echo "$(GREEN)Variables:$(NC)"
+	@echo "  SERVERS       - Comma-separated server list"
+	@echo "  CONFIG_FILE   - Path to mcp-servers.json (default: $(CONFIG_FILE))"
+	@echo "  ENV_FILE      - Path to .env file (default: $(ENV_FILE))"
+	@echo "  SCOPE         - user|project (default: $(SCOPE))"
+	@echo "  PROJECT       - Project path (default: $(PROJECT))"
+	@echo "  SSH_HOST      - Target hostname/IP (default: $(SSH_HOST))"
+	@echo "  SSH_USER      - SSH username (default: $(SSH_USER))"
+	@echo ""
+	@echo "$(GREEN)Examples:$(NC)"
+	@echo "  make sync CONFIG_FILE=custom.json"
+	@echo "  make add SERVERS=memory,github SCOPE=project"
 	@echo "  make sync-remote SSH_HOST=192.168.1.100 SSH_USER=ubuntu"
-	@echo "  make add-remote SERVERS=memory SSH_HOST=server.com SSH_USER=admin"
+	@echo "  make project-add SERVERS=brave-search PROJECT=/path/to/project"
 	@echo ""
-	@echo "  $(GREEN)Project examples:$(NC)"
-	@echo "  make project-sync                            # Sync for current project"
-	@echo "  make project-add SERVERS=memory              # Add to current project"
-	@echo ""
+	@echo "$(GREEN)Documentation:$(NC)"
+	@echo "  docs/INSTALLATION.md  - Installation guide"
+	@echo "  docs/CONFIGURATION.md - Configuration reference"
+	@echo "  docs/ADVANCED.md      - Ansible usage guide"
 
-# ===== LOCAL OPERATIONS =====
-
-# List current MCP servers locally
-.PHONY: list
+# Core commands
+.PHONY: list sync add remove clean dry-run
 list:
-	@echo "$(YELLOW)Listing MCP servers...$(NC)"
 	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-i "localhost," \
-		-e "mcp_mode=list" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
+		-e "mode=all" \
+		-e "operation_mode=list" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
 		-e "mcp_target_host=$(SSH_HOST)" \
 		-e "ansible_user=$(SSH_USER)"
 
-# Sync all servers from configuration locally
-.PHONY: sync
 sync:
-	@echo "$(YELLOW)Syncing all MCP servers from configuration...$(NC)"
 	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=sync" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
+		-e "mode=all" \
+		-e "operation_mode=sync" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
 		-e "mcp_target_host=$(SSH_HOST)" \
 		-e "ansible_user=$(SSH_USER)"
 
-# Dry-run to check configuration without making changes
-.PHONY: dry-run
-dry-run:
-	@echo "$(YELLOW)Running dry-run to check configuration...$(NC)"
-	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=sync" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
-		-e "mcp_target_host=$(SSH_HOST)" \
-		-e "ansible_user=$(SSH_USER)" \
-		-e "mcp_dry_run=true"
-
-# Add specific servers locally
-.PHONY: add
 add:
-	@if [ -z "$(SERVERS)" ]; then \
-		echo "$(RED)Error: SERVERS variable is required$(NC)"; \
-		echo "Usage: make add SERVERS=memory,brave-search"; \
-		exit 1; \
-	fi
-	@echo "$(YELLOW)Adding MCP servers: $(SERVERS)$(NC)"
+	@test -n "$(SERVERS)" || (echo "Error: SERVERS parameter required"; exit 1)
 	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=individual" \
+		-e "mode=individual" \
 		-e "operation_mode=add" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "mcp_servers_list=$(SERVERS)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
+		-e "servers=$(SERVERS)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
 		-e "mcp_target_host=$(SSH_HOST)" \
 		-e "ansible_user=$(SSH_USER)"
 
-# Add ALL servers from configuration locally
-.PHONY: add-all
-add-all:
-	@echo "$(YELLOW)Adding ALL MCP servers from configuration...$(NC)"
-	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=all" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
-		-e "mcp_target_host=$(SSH_HOST)" \
-		-e "ansible_user=$(SSH_USER)"
-
-# Remove specific servers locally
-.PHONY: remove
 remove:
-	@if [ -z "$(SERVERS)" ]; then \
-		echo "$(RED)Error: SERVERS variable is required$(NC)"; \
-		echo "Usage: make remove SERVERS=github"; \
-		exit 1; \
-	fi
-	@echo "$(YELLOW)Removing MCP servers: $(SERVERS)$(NC)"
+	@test -n "$(SERVERS)" || (echo "Error: SERVERS parameter required"; exit 1)
 	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=individual" \
+		-e "mode=individual" \
 		-e "operation_mode=remove" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "mcp_servers_list=$(SERVERS)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
+		-e "servers=$(SERVERS)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
 		-e "mcp_target_host=$(SSH_HOST)" \
 		-e "ansible_user=$(SSH_USER)"
 
-# Clean orphaned servers locally
-.PHONY: clean
 clean:
-	@echo "$(YELLOW)Cleaning orphaned servers...$(NC)"
 	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=cleanup" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
+		-e "mode=all" \
+		-e "operation_mode=clean" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
 		-e "mcp_target_host=$(SSH_HOST)" \
 		-e "ansible_user=$(SSH_USER)"
 
-# ===== REMOTE OPERATIONS =====
-
-# Sync all servers from configuration on remote host
-.PHONY: sync-remote
-sync-remote:
-	@echo "$(YELLOW)Syncing all MCP servers on remote host $(SSH_HOST)...$(NC)"
+dry-run:
 	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=sync" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
+		-e "mode=all" \
+		-e "operation_mode=sync" \
+		-e "dry_run=true" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
 		-e "mcp_target_host=$(SSH_HOST)" \
 		-e "ansible_user=$(SSH_USER)"
 
-# Add specific servers on remote host
-.PHONY: add-remote
-add-remote:
-	@if [ -z "$(SERVERS)" ]; then \
-		echo "$(RED)Error: SERVERS variable is required$(NC)"; \
-		echo "Usage: make add-remote SERVERS=memory,brave-search SSH_HOST=host"; \
-		exit 1; \
-	fi
-	@echo "$(YELLOW)Adding MCP servers $(SERVERS) on remote host $(SSH_HOST)...$(NC)"
-	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=individual" \
-		-e "operation_mode=add" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "mcp_servers_list=$(SERVERS)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
-		-e "mcp_target_host=$(SSH_HOST)" \
-		-e "ansible_user=$(SSH_USER)"
-
-# Remove specific servers on remote host
-.PHONY: remove-remote
-remove-remote:
-	@if [ -z "$(SERVERS)" ]; then \
-		echo "$(RED)Error: SERVERS variable is required$(NC)"; \
-		echo "Usage: make remove-remote SERVERS=github SSH_HOST=host"; \
-		exit 1; \
-	fi
-	@echo "$(YELLOW)Removing MCP servers $(SERVERS) on remote host $(SSH_HOST)...$(NC)"
-	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=individual" \
-		-e "operation_mode=remove" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "mcp_servers_list=$(SERVERS)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
-		-e "mcp_target_host=$(SSH_HOST)" \
-		-e "ansible_user=$(SSH_USER)"
-
-# List current MCP servers on remote host
-.PHONY: list-remote
-list-remote:
-	@echo "$(YELLOW)Listing MCP servers on remote host $(SSH_HOST)...$(NC)"
-	@ansible-playbook ansible/manage-mcp.yml \
-		-i "localhost," \
-		-e "mcp_mode=list" \
-		-e "mcp_scope=$(SCOPE)" \
-		-e "mcp_project_path=$(PROJECT)" \
-		-e "config_file=$(abspath $(CONFIG_FILE))" \
-		-e "env_file=$(abspath $(ENV_FILE))" \
-		-e "mcp_target_host=$(SSH_HOST)" \
-		-e "ansible_user=$(SSH_USER)"
-
-# ===== PROJECT OPERATIONS =====
-
-# Sync servers for current project
-.PHONY: project-sync
+# Project commands
+.PHONY: project-sync project-add
 project-sync:
-	@$(MAKE) sync SCOPE=project PROJECT=$(PROJECT)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=all" \
+		-e "operation_mode=sync" \
+		-e "scope=project" \
+		-e "project_path=$(PROJECT)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
 
-# Add servers to current project
-.PHONY: project-add
 project-add:
-	@if [ -z "$(SERVERS)" ]; then \
-		echo "$(RED)Error: SERVERS variable is required$(NC)"; \
-		echo "Usage: make project-add SERVERS=memory,brave-search"; \
-		exit 1; \
-	fi
-	@$(MAKE) add SCOPE=project PROJECT=$(PROJECT) SERVERS="$(SERVERS)"
+	@test -n "$(SERVERS)" || (echo "Error: SERVERS parameter required"; exit 1)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=individual" \
+		-e "operation_mode=add" \
+		-e "scope=project" \
+		-e "project_path=$(PROJECT)" \
+		-e "servers=$(SERVERS)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
 
-# Remove servers from current project
-.PHONY: project-remove
+# Remote commands
+.PHONY: sync-remote add-remote
+sync-remote:
+	@test "$(SSH_HOST)" != "localhost" || (echo "Error: SSH_HOST parameter required for remote operations"; exit 1)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=all" \
+		-e "operation_mode=sync" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
+
+add-remote:
+	@test -n "$(SERVERS)" || (echo "Error: SERVERS parameter required"; exit 1)
+	@test "$(SSH_HOST)" != "localhost" || (echo "Error: SSH_HOST parameter required for remote operations"; exit 1)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=individual" \
+		-e "operation_mode=add" \
+		-e "servers=$(SERVERS)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
+
+# Advanced commands (available but not in main help)
+.PHONY: add-all project-remove project-list remove-remote list-remote check-syntax test-connection
+add-all:
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=all" \
+		-e "operation_mode=add" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
+
 project-remove:
-	@if [ -z "$(SERVERS)" ]; then \
-		echo "$(RED)Error: SERVERS variable is required$(NC)"; \
-		echo "Usage: make project-remove SERVERS=github"; \
-		exit 1; \
-	fi
-	@$(MAKE) remove SCOPE=project PROJECT=$(PROJECT) SERVERS="$(SERVERS)"
+	@test -n "$(SERVERS)" || (echo "Error: SERVERS parameter required"; exit 1)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=individual" \
+		-e "operation_mode=remove" \
+		-e "scope=project" \
+		-e "project_path=$(PROJECT)" \
+		-e "servers=$(SERVERS)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
 
-# List servers in current project
-.PHONY: project-list
 project-list:
-	@$(MAKE) list SCOPE=project PROJECT=$(PROJECT)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=all" \
+		-e "operation_mode=list" \
+		-e "scope=project" \
+		-e "project_path=$(PROJECT)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
 
-# ===== UTILITY OPERATIONS =====
+remove-remote:
+	@test -n "$(SERVERS)" || (echo "Error: SERVERS parameter required"; exit 1)
+	@test "$(SSH_HOST)" != "localhost" || (echo "Error: SSH_HOST parameter required for remote operations"; exit 1)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=individual" \
+		-e "operation_mode=remove" \
+		-e "servers=$(SERVERS)" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
 
-# Check Ansible syntax
-.PHONY: check-syntax
+list-remote:
+	@test "$(SSH_HOST)" != "localhost" || (echo "Error: SSH_HOST parameter required for remote operations"; exit 1)
+	@ansible-playbook ansible/manage-mcp.yml \
+		-e "mode=all" \
+		-e "operation_mode=list" \
+		-e "config_file=$(CONFIG_FILE)" \
+		-e "env_file=$(ENV_FILE)" \
+		-e "mcp_target_host=$(SSH_HOST)" \
+		-e "ansible_user=$(SSH_USER)"
+
 check-syntax:
-	@echo "$(YELLOW)Checking Ansible playbook syntax...$(NC)"
-	@ansible-playbook --syntax-check ansible/manage-mcp.yml -e "mcp_target_host=localhost"
+	@ansible-playbook --syntax-check ansible/manage-mcp.yml
 
-# Test connection to remote host
-.PHONY: test-connection
 test-connection:
-	@echo "$(YELLOW)Testing connection to $(SSH_HOST)...$(NC)"
+	@test "$(SSH_HOST)" != "localhost" || (echo "Error: SSH_HOST parameter required"; exit 1)
 	@ansible $(SSH_HOST) -u $(SSH_USER) -m ping
 
-# Show current configuration
+# Utility commands
 .PHONY: show-config
 show-config:
-	@echo "$(YELLOW)Current configuration:$(NC)"
-	@echo "  Config file: $(CONFIG_FILE)"
-	@echo "  Env file: $(ENV_FILE)"
+	@echo "$(YELLOW)Configuration:$(NC)"
+	@echo "  Config: $(CONFIG_FILE)"
+	@echo "  Env: $(ENV_FILE)"
 	@echo "  Scope: $(SCOPE)"
 	@echo "  Project: $(PROJECT)"
-	@echo "  SSH Host: $(SSH_HOST)"
-	@echo "  SSH User: $(SSH_USER)"
+	@echo "  SSH: $(SSH_USER)@$(SSH_HOST)"
