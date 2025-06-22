@@ -114,8 +114,8 @@
       {% set errors = [] -%}
       {% set results = parallel_wait_results.results if mcp_operation_parallel_enabled else server_operation_results.results -%}
       {% for result in results | default([]) -%}
-        {% if result.rc != 0 -%}
-          {% set _ = errors.append({'server': result.item, 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
+        {% if result.rc is defined and result.rc != 0 -%}
+          {% set _ = errors.append({'server': result.item | default('unknown'), 'error': result.stderr | default('Unknown error'), 'rc': result.rc}) -%}
         {% endif -%}
       {% endfor -%}
       {{ errors }}
