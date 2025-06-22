@@ -7,8 +7,9 @@
 .env.production
 .env.development
 
-# MCP configuration files (auto-generated)
+# MCP configuration files (auto-generated and user-specific)
 .mcp.json
+mcp-servers.json
 
 # Claude settings and files
 .claude/
