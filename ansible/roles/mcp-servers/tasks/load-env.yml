@@ -7,12 +7,14 @@
   stat:
     path: "{{ mcp_env_file }}"
   register: env_file_stat
+  delegate_to: localhost
 
 - name: Read .env file content
   slurp:
     src: "{{ mcp_env_file }}"
   register: env_file_content
   when: env_file_stat.stat.exists
+  delegate_to: localhost
 
 - name: Parse and set environment variables
   set_fact:
@@ -23,15 +25,18 @@
     - item is match('^[A-Z_][A-Z0-9_]*=.*')
     - not item.startswith('#')
   no_log: true
+  delegate_to: localhost
 
 - name: Check for config.yml file
   stat:
     path: "{{ playbook_dir }}/config.yml"
   register: config_file_stat
+  delegate_to: localhost
 
 - name: Load variables from config.yml if exists
   include_vars: "{{ playbook_dir }}/config.yml"
   when: config_file_stat.stat.exists
+  delegate_to: localhost
 
 - name: Debug loaded variables
   debug:
