@@ -35,12 +35,19 @@
             {% set env_resolved = {} -%}
             {% for env_key, env_val in server_config.env.items() -%}
               {% set resolved_val = env_val -%}
-              {% if mcp_parsed_env is defined and env_val.startswith('{{') and env_val.endswith('}}') -%}
-              {% set env_lookup = env_val[2:-2].strip() -%}
-              {% if env_lookup in mcp_parsed_env -%}
-                {% set resolved_val = mcp_parsed_env[env_lookup] -%}
+              {% if mcp_parsed_env is defined -%}
+                {% if env_val.startswith('${') and env_val.endswith('}') -%}
+                  {% set env_lookup = env_val[2:-1].strip() -%}
+                  {% if env_lookup in mcp_parsed_env -%}
+                    {% set resolved_val = mcp_parsed_env[env_lookup] -%}
+                  {% endif -%}
+                {% elif env_val.startswith('{{') and env_val.endswith('}}') -%}
+                  {% set env_lookup = env_val[2:-2].strip() -%}
+                  {% if env_lookup in mcp_parsed_env -%}
+                    {% set resolved_val = mcp_parsed_env[env_lookup] -%}
+                  {% endif -%}
+                {% endif -%}
               {% endif -%}
-            {% endif -%}
             {% set _ = env_resolved.update({env_key: resolved_val}) -%}
           {% endfor -%}
           {% set _ = server_data.update({'env': env_resolved}) -%}

@@ -16,7 +16,7 @@
 
 - name: Parse and set environment variables
   set_fact:
-    "{{ (item.split('=')[0] | lower) }}": "{{ item.split('=', 1)[1] }}"
+    mcp_parsed_env: "{{ mcp_parsed_env | default({}) | combine({item.split('=')[0]: item.split('=', 1)[1]}) }}"
   loop: "{{ (env_file_content.content | b64decode).splitlines() }}"
   when:
     - env_file_stat.stat.exists
@@ -35,5 +35,7 @@
 
 - name: Debug loaded variables
   debug:
-    msg: "Loaded vars: github_token={{ github_token | regex_replace('^(.{6}).*(.{4})$', '\\1****\\2') if github_token is defined and github_token != 'NOT SET' else 'NOT SET' }}, brave_api_key={{ brave_api_key | regex_replace('^(.{6}).*(.{4})$', '\\1****\\2') if brave_api_key is defined and brave_api_key != 'NOT SET' else 'NOT SET' }}, my_custom_var={{ my_custom_var | regex_replace('^(.{6}).*(.{4})$', '\\1****\\2') if my_custom_var is defined and my_custom_var != 'NOT SET' else 'NOT SET' }}"
+    msg: |
+      Loaded environment variables: {{ mcp_parsed_env.keys() | list | length if mcp_parsed_env is defined else 0 }}
+      Variables: {{ mcp_parsed_env.keys() | list | sort | join(', ') if mcp_parsed_env is defined else 'None' }}
   when: ansible_verbosity > 1
